@@ -207,7 +207,11 @@ const HSPU = [
   E('Wall handstand hold', 3, 30, { u: 'sec', t: 'Walk your feet up the wall, chest facing it, hands close to the wall. Squeeze glutes, push the floor away.' }),
   E('Wall HSPU negative', 3, 4, { t: 'Walk up, lower your head to a folded towel over 5 seconds, come down, repeat.' }),
   E('Partial wall HSPU', 3, 5, { t: 'Press back up from a stack of pads under your head. Take a pad away as you get stronger.' }),
-  E('Wall handstand push-up', 3, 3, { t: 'Full range — you made it. Keep adding reps.' })
+  E('Wall handstand push-up', 3, 5, { t: 'Full range, head to the floor and back. This builds the pressing strength; balance comes from Tue/Thu practice.' }),
+  E('Freestanding handstand hold', 3, 20, { u: 'sec', t: 'Kick up in open space. Only count clean holds — log your best hold for each set.' }),
+  E('Freestanding HSPU negative', 3, 3, { t: 'Kick up, find balance, lower to a folded towel over 5 seconds. Bail out by cartwheeling.' }),
+  E('Partial freestanding HSPU', 3, 3, { t: 'Press back up from a stack of pads. Take a pad away as you get stronger.' }),
+  E('Freestanding handstand push-up', 3, 1, { t: 'Full range, no wall. You made it — keep adding reps.' })
 ];
 const SESSIONS = {
   strA: { kind: 'strength', icon: '💪', name: 'Strength A', sub: 'Handstand press & squat', min: 20,
@@ -246,12 +250,13 @@ const SESSIONS = {
       { n: 'Bird dog', s: 60, t: 'Alternate sides slowly, hips level.' },
       { n: 'Side plank', s: 30, sides: true },
       { n: 'Child’s pose — breathe', s: 60, t: 'Long, slow exhales.' }] },
-  skill: { kind: 'timed', icon: '🤸', name: 'Skill: Handstand & flow', sub: 'Rope flow, handstand practice, hips',
-    about: ['3 min rope flow', 'Wrist warm-up', '5 × 30 s handstand practice', 'Hip stretches'],
+  skill: { kind: 'timed', icon: '🤸', name: 'Skill: Handstand & flow', sub: 'Freestanding balance, rope flow, hips',
+    about: ['2 min rope flow', 'Wrist warm-up & bail practice', '6 × 30 s freestanding balance', 'Hip stretches'],
     steps: [
-      { n: 'Rope flow', s: 180 },
+      { n: 'Rope flow', s: 120 },
       { n: 'Wrist warm-up', s: 60, t: 'Rock forward and back on your hands, fingers forward, then backward.' },
-      ...repeat(5, [{ n: 'Handstand practice', s: 30, hard: true, t: 'Wall hold, or kick-ups if you’re working on balance. Come down when form breaks.' }, { n: 'Rest — shake out wrists', s: 45 }]),
+      { n: 'Bail practice', s: 60, t: 'Kick up and come down by stepping one hand forward and turning out of it (a cartwheel exit). Knowing how to bail makes freestanding work safe.' },
+      ...repeat(6, [{ n: 'Freestanding balance', s: 30, hard: true, t: 'Kick up in open space and try to hold. Push the floor away, squeeze glutes, steer with your fingertips. Lots of short tries is the point.' }, { n: 'Rest — shake out wrists', s: 30 }]),
       { n: 'Couch stretch', s: 60, sides: true },
       { n: '90/90 hip switches', s: 60 },
       { n: 'Child’s pose — breathe', s: 60 }] },
@@ -686,7 +691,7 @@ function progressHTML() {
     <div class="stat"><b>${climbs}</b><span class="muted small">climbing sessions this month</span></div>
   </div>
   <section class="card">
-    <h2>🤸 Road to the handstand push-up</h2>
+    <h2>🤸 Road to the freestanding handstand push-up</h2>
     <ol class="ladder">${HSPU.map((h, i) => `<li class="${i < D.hspu ? 'done' : i === D.hspu ? 'cur' : ''}"><span>${esc(h.n)}</span><span class="small">${h.s} × ${h.r}${h.u === 'sec' ? ' s' : ''}</span></li>`).join('')}</ol>
     <p class="muted small">Practised on Strength A and C. Hit every set at your level and you move up automatically.</p>
   </section>
@@ -737,7 +742,7 @@ function settingsHTML() {
     <p class="muted small"><b>Engine</b> intervals on the rower and Echo bike build the fitness to run around with your kids and recover between climbs.</p>
     <p class="muted small"><b>Unwind</b> works the hip flexors, hamstrings and glutes that tighten up from squatting and kneeling on a roof and pull on your low back. Following Low Back Ability’s approach, your back is trained rather than protected: seated good mornings and back extensions get slowly heavier, and Jefferson curls build comfort bending forward. Bird dogs and side planks add endurance.</p>
     <p class="muted small"><b>Climbing</b>: pull-ups, dead hangs, hanging knee raises and hollow holds build pulling, grip and core strength.</p>
-    <p class="muted small"><b>Handstand push-up</b>: a 6-step ladder, practised twice a week, plus handstand skill work on Tuesday and Thursday evenings.</p>
+    <p class="muted small"><b>Freestanding handstand push-up</b>: a ${HSPU.length}-step ladder on Strength A and C. The wall steps build the pressing strength, while Tuesday and Thursday evenings train the balance from day one, so both are ready by the time you reach the freestanding steps.</p>
     <p class="muted small">If back pain is sharp, runs down a leg, or isn't getting better after a few weeks, get it checked by a physio.</p>
   </section>
   <section class="card">
