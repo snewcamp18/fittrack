@@ -294,7 +294,7 @@ const minsOf = s => s.kind === 'timed' ? Math.round(s.steps.reduce((n, x) => n +
 const exDef = def => def.ladder ? { ...HSPU[D.hspu], ss: def.ss, ladder: true } : def;
 
 /* ---------- storage ---------- */
-const defaults = () => ({ onboarded: false, settings: { unit: 'lb', goal: 10, rest: 60, prep: 5 }, hspu: 0, workouts: [], weights: [], checkins: [], active: null, plan: {} });
+const defaults = () => ({ onboarded: false, settings: { unit: 'lb', goal: 10, rest: 60, prep: 5, prog: 'double' }, hspu: 0, workouts: [], weights: [], checkins: [], active: null, plan: {} });
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(KEY));
@@ -354,22 +354,61 @@ const usesWeight = ex => ex.sets.some(s => s.weight > 0);
 const best = ex => usesWeight(ex) ? Math.max(...ex.sets.map(s => s.weight || 0)) : Math.max(...ex.sets.map(s => s.reps || 0));
 const setText = (s, u) => s.weight ? `${s.reps} × ${s.weight}` : `${s.reps}${u === 'sec' ? 's' : ''}`;
 
-// Progressive overload: if every set hit the target last time, ask for a bit more today.
-function suggest(def) {
-  const unit = D.settings.unit, last = lastExercise(def.n);
-  const sets = (reps, weight) => Array.from({ length: def.s }, () => ({ reps, weight, done: false }));
-  if (!last) return { sets: sets(def.r, null), hint: def.w ? 'First time: pick a weight you could lift 2–3 more reps with.' : 'First time — go slow and focus on good form.' };
-  const hit = last.sets.length >= def.s && last.sets.every(s => (s.reps || 0) >= def.r);
-  const topW = Math.max(0, ...last.sets.map(s => s.weight || 0));
-  const topR = Math.max(0, ...last.sets.map(s => s.reps || 0));
-  const lastTxt = last.sets.map(s => setText(s, def.u)).join(', ');
-  if (def.w && topW > 0) {
-    if (hit) { const w = r1(topW + (unit === 'kg' ? 2.5 : 5)); return { sets: sets(def.r, w), last: lastTxt, hint: `You hit every set last time — try ${w} ${unit}.` } }
-    return { sets: sets(def.r, topW), last: lastTxt, hint: `Stay at ${topW} ${unit} and aim for ${def.r} ${def.u} on every set.` };
+/* Progression, worked out from the last sessions of each exercise (each saved exercise remembers the target reps `tr`
+ * and planned sets `ps` it was given, so a hit or a miss can be judged properly).
+ *  Double mode (default): reps climb to a ceiling → a set is added → loaded lifts then add weight and reset reps/sets.
+ *  Two missed sessions in a row at the same load → a lighter reset (about 10% off the bar, or fewer reps) to rebuild.
+ *  Simple mode: add weight (or a rep) as soon as every set is hit. */
+const wInc = () => D.settings.unit === 'kg' ? 2.5 : 5;
+const topWeight = ex => Math.max(0, ...ex.sets.map(s => s.weight || 0));
+const hitPlan = (ex, def) => ex.sets.length >= (ex.ps ?? def.s) && ex.sets.every(s => (s.reps || 0) >= (ex.tr ?? def.r));
+function recent(name, n) {   // newest first
+  const out = [];
+  for (let i = D.workouts.length - 1; i >= 0 && out.length < n; i--) {
+    const w = D.workouts[i];
+    if (w.kind !== 'strength') continue;
+    const ex = w.exercises.find(e => e.n === name);
+    if (ex && ex.sets.length) out.push(ex);
   }
-  if (hit) { const r = Math.max(def.r, topR) + (def.u === 'sec' ? 5 : 1); return { sets: sets(r, null), last: lastTxt, hint: `Nice work last time — aim for ${r} ${def.u}.` } }
-  return { sets: sets(def.r, null), last: lastTxt, hint: `Aim for ${def.r} ${def.u} on every set.` };
+  return out;
 }
+function suggest(def) {
+  const unit = D.settings.unit, hist = recent(def.n, 2), last = hist[0];
+  if (!last) return { sets: Array.from({ length: def.s }, () => ({ reps: def.r, weight: null, done: false })), tr: def.r, hint: def.w ? 'First time: pick a weight you could lift 2–3 more reps with.' : 'First time — go slow and focus on good form.' };
+  const simple = D.settings.prog === 'simple', lastTxt = last.sets.map(s => setText(s, def.u)).join(', ');
+  const make = (sets, reps, weight, hint) => ({ sets: Array.from({ length: sets }, () => ({ reps, weight, done: false })), tr: reps, last: lastTxt, hint });
+  const topW = topWeight(last), loaded = def.w && topW > 0, step = def.u === 'sec' ? 5 : 1;
+  const tr0 = simple ? def.r : last.tr ?? def.r, ps0 = simple ? def.s : last.ps ?? def.s;
+  const cur = Math.max(tr0, Math.min(...last.sets.map(s => s.reps || 0)));   // reps held on every set, if that beat the target
+  const base = loaded ? topW : null;
+  if (!hitPlan(last, def)) {
+    const prev = hist[1];
+    const sameLoad = prev && topWeight(prev) === topW && (prev.tr ?? def.r) === tr0 && (prev.ps ?? def.s) === ps0;
+    if (!simple && sameLoad && !hitPlan(prev, def)) {
+      if (loaded) { const w = Math.max(wInc(), Math.round(topW * 0.9 / wInc()) * wInc()); return make(def.s, def.r, w, `Two tough sessions in a row — a lighter ${w} ${unit} today to rebuild, then build back up.`) }
+      const r = Math.max(def.r, tr0 - 2 * step);
+      return make(def.s, r, null, `Two tough sessions in a row — easing back to ${r} ${def.u} to rebuild.`);
+    }
+    return make(ps0, tr0, base, loaded ? `Stay at ${topW} ${unit} and aim for ${tr0} ${def.u} on every set.` : `Aim for ${tr0} ${def.u} on every set.`);
+  }
+  if (simple) {
+    if (loaded) { const w = r1(topW + wInc()); return make(def.s, def.r, w, `You hit every set last time — try ${w} ${unit}.`) }
+    const r = Math.max(def.r, ...last.sets.map(s => s.reps || 0)) + step;
+    return make(def.s, r, null, `Nice work last time — aim for ${r} ${def.u}.`);
+  }
+  if (loaded) {
+    if (cur < def.r + 2) { const r = cur + 1; return make(ps0, r, topW, `You hit every set — same ${topW} ${unit}, aim for ${r} ${def.u}.`) }
+    if (ps0 < def.s + 1) return make(ps0 + 1, def.r, topW, `Add a set: ${ps0 + 1} × ${def.r} at ${topW} ${unit}.`);
+    const w = r1(topW + wInc());
+    return make(def.s, def.r, w, `Strong! Time for more weight: ${w} ${unit}, back to ${def.s} × ${def.r}.`);
+  }
+  if (cur < def.r + (def.u === 'sec' ? 20 : 4)) { const r = cur + step; return make(ps0, r, null, `Nice work last time — aim for ${r} ${def.u}.`) }
+  if (ps0 < def.s + 2) return make(ps0 + 1, def.r, null, `Add a set: ${ps0 + 1} × ${def.r} ${def.u}.`);
+  const r = cur + step;
+  return make(ps0, r, null, `Nice work last time — aim for ${r} ${def.u}.`);
+}
+// what today's plan looks like for an exercise, e.g. "4 × 5 @ 140"
+const planText = def => { const g = suggest(def), s0 = g.sets[0]; return `${g.sets.length} × ${s0.reps}${def.u === 'sec' ? ' s' : ''}${s0.weight ? ` @ ${s0.weight}` : ''}` };
 
 /* ---------- UI helpers ---------- */
 let toastTimer;
@@ -430,7 +469,7 @@ function onboardHTML() {
 
 /* ---------- today ---------- */
 function previewList(s) {
-  if (s.kind === 'strength') return s.ex.map(exDef).map(e => `<li><span>${esc(e.n)}${e.ss ? ' <span class="tag">superset</span>' : ''}</span><span class="muted">${e.s} × ${e.r}${e.u === 'sec' ? ' s' : ''}</span></li>`).join('');
+  if (s.kind === 'strength') return s.ex.map(exDef).map(e => `<li><span>${esc(e.n)}${e.ss ? ' <span class="tag">superset</span>' : ''}</span><span class="muted">${planText(e)}</span></li>`).join('');
   if (s.about) return s.about.map(a => `<li><span>${esc(a)}</span></li>`).join('');
   if (s.steps) return [...new Set(s.steps.map(x => x.n))].map(n => `<li><span>${esc(n)}</span></li>`).join('');
   return '';
@@ -490,7 +529,7 @@ function begin(sid, slot) {
 function startWorkout(sid, slot) {
   D.active = {
     id: uid(), at: Date.now(), session: sid, slot,
-    exercises: SESSIONS[sid].ex.map(exDef).map(def => { const s = suggest(def); return { n: def.n, u: def.u, w: def.w, t: def.t, ss: def.ss, ladder: def.ladder, hint: s.hint, last: s.last || '', target: def.r, sets: s.sets } })
+    exercises: SESSIONS[sid].ex.map(exDef).map(def => { const s = suggest(def); return { n: def.n, u: def.u, w: def.w, t: def.t, ss: def.ss, ladder: def.ladder, hint: s.hint, last: s.last || '', target: def.r, tr: s.tr, ps: s.sets.length, sets: s.sets } })
   };
   save(); keepAwake(); go('today');
 }
@@ -519,7 +558,7 @@ function workoutHTML() {
 function finishWorkout() {
   const a = D.active;
   const exercises = a.exercises.map(ex => ({
-    n: ex.n, u: ex.u,
+    n: ex.n, u: ex.u, tr: ex.tr, ps: ex.ps,
     sets: ex.sets.filter(s => s.done).map(s => ({ reps: num(s.reps) ?? 0, weight: ex.w ? num(s.weight) : null }))
   })).filter(ex => ex.sets.length);
   if (!exercises.length) {
@@ -785,6 +824,7 @@ function settingsHTML() {
     <label class="field">Handstand push-up level<select data-set="hspu">${HSPU.map((h, i) => opt(i, `${i + 1}. ${esc(h.n)}`, D.hspu)).join('')}</select></label>
     <label class="field">Units<select data-set="unit">${opt('lb', 'Pounds & miles', s.unit)}${opt('kg', 'Kilograms & km', s.unit)}</select></label>
     <label class="field">Get-ready time before each timed step<select data-set="prep">${[0, 3, 5, 8, 10].map(n => opt(n, n ? `${n} seconds` : 'None', s.prep)).join('')}</select></label>
+    <label class="field">Progression<select data-set="prog">${opt('double', 'Reps, then sets, then weight', s.prog)}${opt('simple', 'Add weight or a rep as soon as every set is hit', s.prog)}</select></label>
     <label class="field">Rest between sets<select data-set="rest">${[30, 45, 60, 90, 120].map(n => opt(n, n < 60 ? `${n} seconds` : `${mmss(n)} min`, s.rest)).join('')}</select></label>
   </section>
   <section class="card">
@@ -794,7 +834,7 @@ function settingsHTML() {
   </section>
   <section class="card">
     <h2>How it works</h2>
-    <p class="muted small"><b>Strength</b> pairs exercises in supersets so you get three or four lifts done in 20 minutes. Lift with one or two reps left in the tank — you still have to work. When you hit every set, the app adds weight or reps next time.</p>
+    <p class="muted small"><b>Strength</b> pairs exercises in supersets so you get three or four lifts done in 20 minutes. Lift with one or two reps left in the tank — you still have to work. When you hit every set, the next session asks for a rep more; at the top of the rep range it adds a set, and loaded lifts then go up in weight. Miss twice in a row at the same load and it eases you back (about 10% lighter) to rebuild. You can switch to simple progression in Settings.</p>
     <p class="muted small"><b>Engine</b> intervals on the rower and Echo bike build the fitness to run around with your kids and recover between climbs.</p>
     <p class="muted small"><b>Unwind</b> works the hip flexors, hamstrings and glutes that tighten up from squatting and kneeling on a roof and pull on your low back. Following Low Back Ability’s approach, your back is trained rather than protected: seated good mornings and back extensions get slowly heavier, and Jefferson curls build comfort bending forward. Bird dogs and side planks add endurance.</p>
     <p class="muted small"><b>Climbing</b>: pull-ups, dead hangs, hanging knee raises and hollow holds build pulling, grip and core strength.</p>
@@ -861,7 +901,7 @@ const actions = {
     const def = E(n, Math.min(10, Math.max(1, parseInt($('#nxSets').value) || 3)), 10, { u: $('#nxU').value, w: $('#nxW').value === '1' });
     const last = lastExercise(n), s = suggest(def);
     if (!last) s.sets.forEach(x => x.reps = def.u === 'sec' ? 30 : 10);
-    D.active.exercises.push({ n, u: def.u, w: def.w, t: '', hint: last ? s.hint : '', last: s.last || '', sets: s.sets });
+    D.active.exercises.push({ n, u: def.u, w: def.w, t: '', hint: last ? s.hint : '', last: s.last || '', tr: s.sets[0].reps, ps: s.sets.length, sets: s.sets });
     save(); closeSheet(); render(); window.scrollTo(0, document.body.scrollHeight);
   },
   finish() { finishWorkout() },
