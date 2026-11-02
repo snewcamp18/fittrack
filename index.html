@@ -85,6 +85,7 @@
   .pstep { font-size: 26px; }
   .ptime { font-size: 76px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; margin-top: 14px !important; }
   .player.hard .ptime { color: var(--hot); }
+  .player.ready .ptime { color: var(--muted); }
   .bigclock { font-size: 44px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: 4px; }
   .bigclock span { font-size: 15px; font-weight: 500; color: var(--muted); }
   .warm { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -134,7 +135,7 @@
   .feel button b { font-size: 26px; }
   .sched td { padding: 6px 4px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: top; }
   .sched { width: 100%; border-collapse: collapse; }
-  .sched td:first-child { color: var(--muted); font-weight: 600; width: 44px; }
+  .sched td:first-child { color: var(--muted); font-weight: 600; width: 52px; }
 
   .weekhead { font-size: 13px; color: var(--muted); font-weight: 600; margin: 18px 4px 8px; }
   details.card summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -197,7 +198,7 @@ const num = v => { const n = parseFloat(v); return isFinite(n) ? n : null };
 const r1 = n => Math.round(n * 10) / 10;
 const mmss = s => `${Math.floor(s / 60)}:${pad(s % 60)}`;
 const distUnit = () => D.settings.unit === 'kg' ? 'km' : 'mi';
-const repeat = (n, steps) => Array.from({ length: n }, () => steps).flat();
+const repeat = (n, steps) => Array.from({ length: n }, (_, i) => typeof steps === 'function' ? steps(i) : steps).flat();
 
 /* ---------- the program ----------
  * Two 15–20 minute sessions a day. Mornings: strength (supersets, so three or four lifts fit) or engine intervals.
@@ -218,28 +219,28 @@ const HSPU = [
   E('Freestanding handstand push-up', 3, 1, { t: 'Full range, no wall. You made it — keep adding reps.' })
 ];
 const SESSIONS = {
-  strA: { kind: 'strength', icon: '💪', name: 'Strength A', sub: 'Handstand press & squat', min: 20,
-    warm: '2 min jump rope, then 2 light sets of squats.', warmSec: 120,
+  strA: { kind: 'strength', icon: '💪', name: 'Strength A', sub: 'Handstand press & squat', min: 22,
+    warm: '4 min jump rope, then 2 light sets of squats.', warmSec: 240,
     ex: [{ ...LADDER, ss: true }, E('Back squat', 3, 5, { w: true }),
          E('Back extension', 2, 12, { w: true, ss: true, t: 'Hinge at the hips, squeeze glutes at the top, don’t over-arch. Hug a plate when 12 gets easy.' }),
          E('Hanging knee raise', 2, 10, { t: 'Slow and controlled, no swinging. Climbing core.' })] },
-  strB: { kind: 'strength', icon: '🧗', name: 'Strength B', sub: 'Pull & hinge — climbing day', min: 20,
-    warm: '2 min rope flow, then 5 scap pull-ups (hang and pull your shoulders down).', warmSec: 120,
+  strB: { kind: 'strength', icon: '🧗', name: 'Strength B', sub: 'Pull & hinge — climbing day', min: 22,
+    warm: '4 min rope flow, then 5 scap pull-ups (hang and pull your shoulders down).', warmSec: 240,
     ex: [E('Pull-up', 4, 5, { ss: true, t: 'Can’t hit 5? Do what you can, then slow 5-second lowerings. Easy? Hold a dumbbell between your feet.' }),
          E('Romanian deadlift', 3, 8, { w: true, t: 'Push hips back, flat back, soft knees. Stop when your hamstrings stretch — not your low back.' }),
          E('Dead hang', 3, 30, { u: 'sec', ss: true, t: 'Grip strength for bouldering. Active shoulders: pull them slightly down.' }),
          E('Hollow body hold', 3, 20, { u: 'sec', t: 'Low back pressed into the floor the whole time.' })] },
-  strC: { kind: 'strength', icon: '💪', name: 'Strength C', sub: 'Handstand press, bench & single leg', min: 20,
-    warm: '2 min jump rope, then a light set of bench.', warmSec: 120,
+  strC: { kind: 'strength', icon: '💪', name: 'Strength C', sub: 'Handstand press, bench & single leg', min: 22,
+    warm: '4 min jump rope, then a light set of bench.', warmSec: 240,
     ex: [{ ...LADDER, ss: true }, E('Bench press', 3, 6, { w: true }),
          E('Bulgarian split squat', 2, 8, { w: true, ss: true, t: 'Back foot on the bench, dumbbells in hand. Reps per leg — stretches tight hip flexors too.' }),
          E('Seated good morning', 2, 10, { w: true, t: 'Low Back Ability style: sit on the bench, legs wide, hinge forward slowly and come back up. Start with just the bar or a light dumbbell and add a little at a time.' })] },
   eng1: { kind: 'timed', icon: '🔥', name: 'Engine: Row', sub: 'Rower intervals',
-    about: ['2 min easy warm-up', '6 rounds: 1 min hard · 1 min easy', '2 min cool-down'],
-    steps: [{ n: 'Easy row — warm up', s: 120 }, ...repeat(6, [{ n: 'Row hard', s: 60, hard: true, t: 'Hard but steady — you should finish every round.' }, { n: 'Row easy', s: 60 }]), { n: 'Easy row — cool down', s: 120 }] },
+    about: ['4 min easy warm-up', '6 rounds: 1 min hard · 1 min easy', '2 min cool-down'],
+    steps: [{ n: 'Easy row — warm up', s: 240 }, ...repeat(6, i => [{ n: 'Row hard', s: 60, hard: true, flow: i > 0, t: 'Hard but steady — you should finish every round.' }, { n: 'Row easy', s: 60, flow: true }]), { n: 'Easy row — cool down', s: 120, flow: true }] },
   eng2: { kind: 'timed', icon: '🔥', name: 'Engine: Bike & rope', sub: 'Echo bike + jump rope',
-    about: ['2 min rope flow', '6 rounds: 20 s bike sprint · 40 s easy spin · 1 min jump rope', '2 min easy spin'],
-    steps: [{ n: 'Rope flow — warm up', s: 120 }, ...repeat(6, [{ n: 'Echo bike — all out', s: 20, hard: true }, { n: 'Easy spin', s: 40 }, { n: 'Jump rope', s: 60 }]), { n: 'Easy spin — cool down', s: 120 }] },
+    about: ['4 min rope flow', '6 rounds: 20 s bike sprint · 40 s easy spin · 1 min jump rope', '2 min easy spin'],
+    steps: [{ n: 'Rope flow — warm up', s: 240 }, ...repeat(6, [{ n: 'Echo bike — all out', s: 20, hard: true }, { n: 'Easy spin', s: 40, flow: true }, { n: 'Jump rope', s: 60 }]), { n: 'Easy spin — cool down', s: 120 }] },
   unwind: { kind: 'timed', icon: '🧘', name: 'Unwind', sub: 'Hips, legs & low back',
     steps: [
       { n: 'Passive dead hang', s: 30, t: 'Relax and let your spine stretch out. Feet can touch a box if needed.' },
@@ -255,12 +256,12 @@ const SESSIONS = {
       { n: 'Side plank', s: 30, sides: true },
       { n: 'Child’s pose — breathe', s: 60, t: 'Long, slow exhales.' }] },
   skill: { kind: 'timed', icon: '🤸', name: 'Skill: Handstand & flow', sub: 'Freestanding balance, rope flow, hips',
-    about: ['2 min rope flow', 'Wrist warm-up & bail practice', '6 × 30 s freestanding balance', 'Hip stretches'],
+    about: ['4 min rope flow', 'Wrist warm-up & bail practice', '6 × 30 s freestanding balance', 'Hip stretches'],
     steps: [
-      { n: 'Rope flow', s: 120 },
+      { n: 'Rope flow', s: 240 },
       { n: 'Wrist warm-up', s: 60, t: 'Rock forward and back on your hands, fingers forward, then backward.' },
       { n: 'Bail practice', s: 60, t: 'Kick up and come down by stepping one hand forward and turning out of it (a cartwheel exit). Knowing how to bail makes freestanding work safe.' },
-      ...repeat(6, [{ n: 'Freestanding balance', s: 30, hard: true, t: 'Kick up in open space and try to hold. Push the floor away, squeeze glutes, steer with your fingertips. Lots of short tries is the point.' }, { n: 'Rest — shake out wrists', s: 30 }]),
+      ...repeat(6, i => [{ n: 'Freestanding balance', s: 30, hard: true, flow: i > 0, t: 'Kick up in open space and try to hold. Push the floor away, squeeze glutes, steer with your fingertips. Lots of short tries is the point.' }, { n: 'Rest — shake out wrists', s: 30, flow: true }]),
       { n: 'Couch stretch', s: 60, sides: true },
       { n: '90/90 hip switches', s: 60 },
       { n: 'Child’s pose — breathe', s: 60 }] },
@@ -287,13 +288,13 @@ const TIPS = [
   'Short on time? Do just the first superset. Something beats nothing.',
   'Weigh in at the same time each morning and watch the trend, not the day.',
   'Back tight after work? Do the Unwind first thing when you get home, before you sit down.',
-  'Rope flow on a busy day still counts — two minutes loosens up your shoulders and hips.'
+  'Rope flow on a busy day still counts — a few minutes loosens up your shoulders and hips.'
 ];
 const minsOf = s => s.kind === 'timed' ? Math.round(s.steps.reduce((n, x) => n + x.s * (x.sides ? 2 : 1), 0) / 60) : s.min;
 const exDef = def => def.ladder ? { ...HSPU[D.hspu], ss: def.ss, ladder: true } : def;
 
 /* ---------- storage ---------- */
-const defaults = () => ({ onboarded: false, settings: { unit: 'lb', goal: 10, rest: 60 }, hspu: 0, workouts: [], weights: [], checkins: [], active: null });
+const defaults = () => ({ onboarded: false, settings: { unit: 'lb', goal: 10, rest: 60, prep: 5 }, hspu: 0, workouts: [], weights: [], checkins: [], active: null, plan: {} });
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(KEY));
@@ -304,6 +305,26 @@ function load() {
 let D = load();
 function save() { try { localStorage.setItem(KEY, JSON.stringify(D)) } catch (e) { toast('Could not save — is storage full?') } }
 function addWorkout(w) { D.workouts.push(w); D.workouts.sort((a, b) => a.at - b.at) }
+/* The weekly SCHEDULE is the default; D.plan holds per-date changes made by picking a different session
+ * (plan[date] = { am?, pm? }, null = rest). */
+const planned = (date, slot) => { const o = D.plan[date]; return o && slot in o ? o[slot] : SCHEDULE[parseYmd(date).getDay()][slot] };
+// Doing `sid` today in place of what's planned: it takes today's spot and everything after it slides back a day
+// until the session's own later spot is filled (it's been pulled forward) or a rest day absorbs the shift.
+// Returns true if any later day changed.
+function bumpPlan(slot, sid) {
+  const dates = Array.from({ length: 15 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() + i); return ymd(d) });
+  const set = (date, v) => { (D.plan[date] = D.plan[date] || {})[slot] = v };
+  let carry = planned(dates[0], slot), moved = false;
+  set(dates[0], sid);
+  for (let i = 1; carry && i < dates.length; i++) {
+    const old = planned(dates[i], slot);
+    set(dates[i], carry); moved = true;
+    if (old === sid) break;
+    carry = old;
+  }
+  for (const k of Object.keys(D.plan)) if (k < dates[0]) delete D.plan[k];
+  return moved;
+}
 function byDate(list, date, entry) { const out = list.filter(x => x.date !== date); out.push(entry); return out.sort((a, b) => a.date < b.date ? -1 : 1) }
 
 /* ---------- stats ---------- */
@@ -427,7 +448,7 @@ function slotCard(slot, sid) {
   </section>`;
 }
 function todayHTML() {
-  const s = D.settings, day = SCHEDULE[new Date().getDay()];
+  const s = D.settings, day = { am: planned(ymd(), 'am'), pm: planned(ymd(), 'pm') };
   const wk = weekCounts()[weekKey(new Date())] || 0, streak = weekStreak(), lw = D.weights.at(-1);
   const dots = Array.from({ length: Math.max(s.goal, wk) }, (_, i) => `<i class="${i < wk ? 'on' : ''}"></i>`).join('');
   const pmFirst = new Date().getHours() >= 15 || D.workouts.some(w => w.date === ymd() && w.slot === 'am');
@@ -455,6 +476,11 @@ function begin(sid, slot) {
   closeSheet();
   if (D.active || P) { toast('Finish or end your current session first'); go('today'); return }
   const s = SESSIONS[sid];
+  const extra = D.workouts.some(w => w.date === ymd() && w.slot === slot);   // today's slot is already done: no need to shift anything
+  if (slot && s.kind !== 'cardio' && !extra && planned(ymd(), slot) !== sid) {   // logging an outdoor activity can still be cancelled, so it never shifts the plan
+    const moved = bumpPlan(slot, sid); save();
+    if (moved) toast('Plan updated — the rest of your sessions move back a day');
+  }
   if (s.kind === 'strength') startWorkout(sid, slot);
   else if (s.kind === 'timed') startTimed(sid, slot);
   else cardioSheet(slot);
@@ -471,7 +497,7 @@ function startWorkout(sid, slot) {
 function workoutHTML() {
   const a = D.active, unit = D.settings.unit, s = SESSIONS[a.session] || { name: 'Workout', icon: '💪' };
   return `<header class="top"><div><h1>${s.icon} ${esc(s.name)}</h1><p class="bigclock"><b id="elapsed">${elapsed(a.at)}</b> <span>elapsed</span></p></div><button class="ghost small" data-act="discard">Discard</button></header>
-    ${s.warm ? `<section class="card"><p class="eyebrow">Warm-up</p><p>${esc(s.warm)}</p>${s.warmSec ? `<div class="warm"><b id="warmLeft">${mmss(warmLeft(s.warmSec))}</b><button class="${warmEnd ? 'ghost' : 'primary'}" data-act="warm">${warmEnd ? 'Stop' : '▶ Start 2 min timer'}</button></div>` : ''}</section>` : ''}` +
+    ${s.warm ? `<section class="card"><p class="eyebrow">Warm-up</p><p>${esc(s.warm)}</p>${s.warmSec ? `<div class="warm"><b id="warmLeft">${mmss(warmLeft(s.warmSec))}</b><button class="${warmEnd ? 'ghost' : 'primary'}" data-act="warm">${warmEnd ? 'Stop' : `▶ Start ${s.warmSec / 60} min timer`}</button></div>` : ''}</section>` : ''}` +
     a.exercises.map((ex, i) => `<section class="card">
       <div class="exhead"><h2>${esc(ex.n)}</h2><span class="muted small">${ex.sets.filter(s => s.done).length}/${ex.sets.length} sets</span></div>
       ${ex.ladder ? `<p class="tag">🤸 Handstand push-up level ${D.hspu + 1} of ${HSPU.length}</p>` : ''}
@@ -561,7 +587,10 @@ function tickWarm() {
 let P = null, pTick = null;
 function startTimed(sid, slot) {
   initAudio();
-  const steps = SESSIONS[sid].steps.flatMap(s => s.sides ? [{ ...s, n: `${s.n} — left` }, { ...s, n: `${s.n} — right` }] : [s]);
+  const real = SESSIONS[sid].steps.flatMap(s => s.sides ? [{ ...s, n: `${s.n} — left` }, { ...s, n: `${s.n} — right` }] : [s]);
+  // a short "get ready" countdown before the session and before each step, except steps that carry straight on (same machine)
+  const prep = D.settings.prep;
+  const steps = prep ? real.flatMap((s, i) => i && s.flow ? [s] : [{ n: 'Get ready', s: prep, ready: true, next: s }, s]) : real;
   P = { sid, slot, steps, i: 0, at: Date.now(), end: Date.now() + steps[0].s * 1000, paused: false, left: 0, lastBeep: null };
   clearInterval(pTick); pTick = setInterval(tickTimed, 200);
   keepAwake(); beep(880, 0.3); go('today');
@@ -581,21 +610,27 @@ function tickTimed() {
 function stepTo(i) {
   if (i >= P.steps.length) { finishTimed(true); return }
   P.i = Math.max(0, i); P.end = Date.now() + P.steps[P.i].s * 1000; P.paused = false; P.lastBeep = null;
-  beep(P.steps[P.i].hard ? 1046 : 880, 0.35); vibrate(P.steps[P.i].hard ? [150, 80, 150] : 200);
+  const st = P.steps[P.i];
+  beep(st.ready ? 660 : st.hard ? 1046 : 880, 0.35); vibrate(st.ready ? 100 : st.hard ? [150, 80, 150] : 200);
   if (tab === 'today') render();
 }
 function playerHTML() {
-  const s = SESSIONS[P.sid], st = P.steps[P.i], next = P.steps[P.i + 1], left = stepLeft();
-  return `<header class="top"><div><p class="eyebrow">${s.icon} ${esc(s.name)}</p><p class="bigclock"><b id="pLeft">${mmss(totalLeft())}</b> <span>left · step ${P.i + 1} of ${P.steps.length}</span></p></div><button class="ghost small" data-act="pquit">End</button></header>
-  <section class="card player ${st.hard ? 'hard' : ''}">
-    <h1 class="pstep">${esc(st.n)}</h1>
+  // "Get ready" countdowns aren't steps the user counts: they show the step that's coming up
+  const s = SESSIONS[P.sid], st = P.steps[P.i], left = stepLeft();
+  const cur = st.ready ? P.i + 1 : P.i, shown = st.ready ? st.next : st;
+  const next = P.steps.slice(cur + 1).find(x => !x.ready);
+  const stepNo = P.steps.slice(0, cur + 1).filter(x => !x.ready).length, stepTotal = P.steps.filter(x => !x.ready).length;
+  return `<header class="top"><div><p class="eyebrow">${s.icon} ${esc(s.name)}</p><p class="bigclock"><b id="pLeft">${mmss(totalLeft())}</b> <span>left · step ${stepNo} of ${stepTotal}</span></p></div><button class="ghost small" data-act="pquit">End</button></header>
+  <section class="card player ${st.ready ? 'ready' : st.hard ? 'hard' : ''}">
+    <h1 class="pstep">${st.ready ? 'Get ready' : esc(st.n)}</h1>
+    ${st.ready ? `<p class="pstep"><b>${esc(shown.n)}</b></p>` : ''}
     <p class="ptime" id="pTime">${mmss(left)}</p>
     <div class="pbar"><i id="pBar" style="width:${100 * (st.s - left) / st.s}%"></i></div>
-    ${st.t ? `<p class="muted">${esc(st.t)}</p>` : ''}
-    <p class="muted small">${next ? `Next: ${esc(next.n)}` : 'Last one!'}</p>
+    ${shown.t ? `<p class="muted">${esc(shown.t)}</p>` : ''}
+    <p class="muted small">${st.ready ? 'Starts when the countdown ends' : next ? `Next: ${esc(next.n)}` : 'Last one!'}</p>
     <div class="pctl"><button data-act="pprev" aria-label="Previous step">⏮</button><button class="primary" data-act="ppause">${P.paused ? '▶ Resume' : '❚❚ Pause'}</button><button data-act="pnext" aria-label="Next step">⏭</button></div>
   </section>
-  <ol class="steps">${P.steps.map((x, i) => `<li class="${i < P.i ? 'past' : i === P.i ? 'cur' : ''}"><span>${esc(x.n)}</span><span>${mmss(x.s)}</span></li>`).join('')}</ol>`;
+  <ol class="steps">${P.steps.map((x, i) => x.ready ? '' : `<li class="${i < cur ? 'past' : i === cur ? 'cur' : ''}"><span>${esc(x.n)}</span><span>${mmss(x.s)}</span></li>`).join('')}</ol>`;
 }
 function finishTimed(complete) {
   clearInterval(pTick); pTick = null; letSleep();
@@ -742,19 +777,20 @@ function progressHTML() {
 /* ---------- settings ---------- */
 function settingsHTML() {
   const s = D.settings, opt = (v, t, cur) => `<option value="${v}" ${String(v) === String(cur) ? 'selected' : ''}>${t}</option>`;
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], order = [1, 2, 3, 4, 5, 6, 0];
+  const upcoming = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() + i); return ymd(d) });
   const nm = id => id ? `${SESSIONS[id].icon} ${esc(SESSIONS[id].name)}` : '<span class="muted">Rest</span>';
   return `<header class="top"><h1>Settings</h1></header>
   <section class="card">
     <label class="field" style="margin-top:0">Weekly goal<select data-set="goal">${[4, 6, 8, 10, 12, 14].map(n => opt(n, `${n} sessions a week`, s.goal)).join('')}</select></label>
     <label class="field">Handstand push-up level<select data-set="hspu">${HSPU.map((h, i) => opt(i, `${i + 1}. ${esc(h.n)}`, D.hspu)).join('')}</select></label>
     <label class="field">Units<select data-set="unit">${opt('lb', 'Pounds & miles', s.unit)}${opt('kg', 'Kilograms & km', s.unit)}</select></label>
+    <label class="field">Get-ready time before each timed step<select data-set="prep">${[0, 3, 5, 8, 10].map(n => opt(n, n ? `${n} seconds` : 'None', s.prep)).join('')}</select></label>
     <label class="field">Rest between sets<select data-set="rest">${[30, 45, 60, 90, 120].map(n => opt(n, n < 60 ? `${n} seconds` : `${mmss(n)} min`, s.rest)).join('')}</select></label>
   </section>
   <section class="card">
-    <h2>Your week</h2>
-    <table class="sched">${order.map(d => `<tr><td>${days[d]}</td><td>☀️ ${nm(SCHEDULE[d].am)}<br>🌙 ${nm(SCHEDULE[d].pm)}</td></tr>`).join('')}</table>
-    <p class="muted small">Any session can be swapped from the Today screen. Going bouldering? Log it in place of Strength B.</p>
+    <h2>Next 7 days</h2>
+    <table class="sched">${upcoming.map((d, i) => `<tr><td>${i ? parseYmd(d).toLocaleDateString(undefined, { weekday: 'short' }) : 'Today'}</td><td>☀️ ${nm(planned(d, 'am'))}<br>🌙 ${nm(planned(d, 'pm'))}</td></tr>`).join('')}</table>
+    <p class="muted small">Pick a different session from the Today screen and everything after it slides back a day to make room (a rest day absorbs the shift). Going bouldering? Log it in place of Strength B.</p>
   </section>
   <section class="card">
     <h2>How it works</h2>
@@ -888,7 +924,7 @@ document.addEventListener('change', e => {
   }
   const k = el.dataset.set; if (!k) return;
   if (k === 'hspu') { D.hspu = +el.value; save(); render(); toast('Saved'); return }
-  const v = k === 'goal' || k === 'rest' ? +el.value : el.value;
+  const v = k === 'goal' || k === 'rest' || k === 'prep' ? +el.value : el.value;
   if (k === 'unit' && v !== D.settings.unit) convertUnits(v);
   D.settings[k] = v; save(); render(); toast('Saved');
 });
