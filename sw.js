@@ -1,6 +1,6 @@
 // Offline support. App files load from the network when it answers quickly (so updates show up
 // right away) and from this cache otherwise.
-const CACHE = 'fittrack-v4';
+const CACHE = 'fittrack-v5';
 const CORE = ['./', 'index.html', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 

@@ -153,6 +153,9 @@
   #sheet .scrim { position: absolute; inset: 0; background: #000a; }
   #sheetBox { position: relative; width: 100%; max-width: 560px; max-height: 90vh; overflow: auto; background: var(--card); border-radius: 20px 20px 0 0; padding: 20px 16px calc(env(safe-area-inset-bottom) + 20px); }
   #sheetBox .row.end { margin-top: 20px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { padding: 7px 12px; font-size: 14px; border-radius: 999px; }
+  .chip.on { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
   .pick { display: flex; flex-direction: column; align-items: flex-start; width: 100%; text-align: left; margin-top: 8px; }
   #toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 12px); transform: translate(-50%, -120px); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-weight: 600; transition: transform .25s; z-index: 20; max-width: calc(100% - 32px); }
   #toast.show { transform: translate(-50%, 0); }
@@ -265,19 +268,20 @@ const SESSIONS = {
       { n: 'Couch stretch', s: 60, sides: true },
       { n: '90/90 hip switches', s: 60 },
       { n: 'Child’s pose — breathe', s: 60 }] },
+  custom: { kind: 'strength', custom: true, icon: '✏️', name: 'Custom workout', sub: 'Your own exercises — type in sets, reps and weights', min: 20, ex: [] },
   play: { kind: 'cardio', icon: '🏃', name: 'Get outside', sub: '20+ min easy: run, hike, bike — or play with the kids', min: 20 }
 };
-// by weekday, Sunday first; null = rest
+// by weekday, Sunday first; null = rest. Sunday morning is always Get outside (see planned()).
 const SCHEDULE = [
-  { am: null, pm: 'unwind' },
+  { am: 'play', pm: 'unwind' },
   { am: 'strA', pm: 'unwind' },
   { am: 'eng1', pm: 'skill' },
   { am: 'strB', pm: 'unwind' },
   { am: 'eng2', pm: 'skill' },
   { am: 'strC', pm: 'unwind' },
-  { am: 'play', pm: 'unwind' }
+  { am: null, pm: 'unwind' }
 ];
-const ACTIVITIES = ['Bouldering', 'Run', 'Walk', 'Hike', 'Bike', 'Row', 'Jump rope', 'Swim', 'Other'];
+const ACTIVITIES = ['Bouldering', 'Run', 'Walk', 'Hike', 'Bike', 'Row', 'Jump rope', 'Swim'];
 const FEEL = [['😌', 'Loose'], ['🙂', 'Good'], ['😐', 'Bit tight'], ['😣', 'Tight'], ['😖', 'Painful']];
 const TIPS = [
   'Lift with one or two reps left in the tank — you still have to work on the roof afterward.',
@@ -307,7 +311,13 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(D)) } catch (e)
 function addWorkout(w) { D.workouts.push(w); D.workouts.sort((a, b) => a.at - b.at) }
 /* The weekly SCHEDULE is the default; D.plan holds per-date changes made by picking a different session
  * (plan[date] = { am?, pm? }, null = rest). */
-const planned = (date, slot) => { const o = D.plan[date]; return o && slot in o ? o[slot] : SCHEDULE[parseYmd(date).getDay()][slot] };
+// Sunday morning is pinned to Get outside: shifts skip over it, and Get outside never lands on another day.
+const isSun = date => parseYmd(date).getDay() === 0;
+const pinned = (date, slot) => slot === 'am' && isSun(date);
+const planned = (date, slot) => {
+  const o = D.plan[date], v = o && slot in o ? o[slot] : SCHEDULE[parseYmd(date).getDay()][slot];
+  return v === 'play' && !isSun(date) ? null : v;
+};
 // Doing `sid` today in place of what's planned: it takes today's spot and everything after it slides back a day
 // until the session's own later spot is filled (it's been pulled forward) or a rest day absorbs the shift.
 // Returns true if any later day changed.
@@ -316,7 +326,9 @@ function bumpPlan(slot, sid) {
   const set = (date, v) => { (D.plan[date] = D.plan[date] || {})[slot] = v };
   let carry = planned(dates[0], slot), moved = false;
   set(dates[0], sid);
+  if (pinned(dates[0], slot)) carry = null;   // swapping out Sunday's Get outside just changes today
   for (let i = 1; carry && i < dates.length; i++) {
+    if (pinned(dates[i], slot)) continue;
     const old = planned(dates[i], slot);
     set(dates[i], carry); moved = true;
     if (old === sid) break;
@@ -325,6 +337,8 @@ function bumpPlan(slot, sid) {
   for (const k of Object.keys(D.plan)) if (k < dates[0]) delete D.plan[k];
   return moved;
 }
+// earlier versions could shift a session onto a future Sunday morning; Sunday is Get outside now
+for (const [k, o] of Object.entries(D.plan || {})) if (o && 'am' in o && isSun(k) && k > ymd()) delete o.am;
 function byDate(list, date, entry) { const out = list.filter(x => x.date !== date); out.push(entry); return out.sort((a, b) => a.date < b.date ? -1 : 1) }
 
 /* ---------- stats ---------- */
@@ -516,7 +530,8 @@ function begin(sid, slot) {
   if (D.active || P) { toast('Finish or end your current session first'); go('today'); return }
   const s = SESSIONS[sid];
   const extra = D.workouts.some(w => w.date === ymd() && w.slot === slot);   // today's slot is already done: no need to shift anything
-  if (slot && s.kind !== 'cardio' && !extra && planned(ymd(), slot) !== sid) {   // logging an outdoor activity can still be cancelled, so it never shifts the plan
+  // logging an outdoor activity can still be cancelled, and a custom workout is a one-off in place of the plan, so neither shifts it
+  if (slot && s.kind !== 'cardio' && !s.custom && !extra && planned(ymd(), slot) !== sid) {
     const moved = bumpPlan(slot, sid); save();
     if (moved) toast('Plan updated — the rest of your sessions move back a day');
   }
@@ -550,9 +565,11 @@ function workoutHTML() {
         ${ex.w ? `<label><input inputmode="decimal" data-e="${i}" data-s="${j}" data-f="weight" value="${s.weight ?? ''}" placeholder="–" aria-label="Set ${j + 1} weight">${unit}</label>` : '<span></span>'}
         <button class="check" data-act="toggle" data-e="${i}" data-s="${j}" aria-label="Set ${j + 1} done" aria-pressed="${s.done}">✓</button>
       </div>`).join('')}</div>
-      <div class="row"><button class="ghost small" data-act="addset" data-e="${i}">+ Set</button>${ex.sets.length > 1 ? `<button class="ghost small" data-act="rmset" data-e="${i}">− Set</button>` : ''}</div>
+      <div class="row"><button class="ghost small" data-act="addset" data-e="${i}">+ Set</button>${ex.sets.length > 1 ? `<button class="ghost small" data-act="rmset" data-e="${i}">− Set</button>` : ''}${ex.sets.some(s => !s.done) ? `<button class="ghost small" data-act="allset" data-e="${i}">✓ All sets</button>` : ''}</div>
     </section>`).join('') +
-    `<button class="ghost wide" data-act="addex">+ Add an exercise</button>
+    (s.custom && !a.exercises.length ? `<section class="card empty"><p>Add each exercise you did or are about to do.</p><p class="muted small" style="margin-top:6px">Type the name, sets, reps and weight. Exercises you've logged before fill in from last time.</p></section>` : '') +
+    `<button class="${s.custom && !a.exercises.length ? 'primary' : 'ghost'} wide" data-act="addex">+ Add an exercise</button>
+     ${s.custom ? `<label class="field">How long did it take? (minutes, optional — leave blank to use the timer)<input id="cuMin" inputmode="numeric" value="${a.mins ?? ''}" placeholder="${Math.max(1, Math.round((Date.now() - a.at) / 60000))}"></label>` : ''}
      <button class="primary wide" data-act="finish">Finish workout</button>`;
 }
 function finishWorkout() {
@@ -573,7 +590,7 @@ function finishWorkout() {
     const done = lad.sets.filter(s => s.done);
     if (done.length >= cur.s && done.every(s => (num(s.reps) || 0) >= cur.r)) { D.hspu++; levelUp = HSPU[D.hspu].n }
   }
-  const w = { id: a.id, kind: 'strength', at: a.at, end: Date.now(), date: ymd(a.at), session: a.session, slot: a.slot, exercises };
+  const w = { id: a.id, kind: 'strength', at: a.at, end: a.mins > 0 ? a.at + a.mins * 60000 : Date.now(), date: ymd(a.at), session: a.session, slot: a.slot, exercises };
   addWorkout(w); D.active = null; save(); stopRest(); stopWarm(); letSleep();
   const sets = exercises.reduce((n, e) => n + e.sets.length, 0);
   tab = 'today'; render();
@@ -690,8 +707,11 @@ function checkinSheet(afterSession) {
 
 /* ---------- activities & weight ---------- */
 function cardioSheet(slot) {
+  // the usual list, plus anything you've typed in before (most recent first)
+  const typed = [...new Set(D.workouts.filter(w => w.kind === 'cardio').reverse().map(w => w.activity))].filter(a => a && !ACTIVITIES.includes(a)).slice(0, 6);
   sheet(`<h2>Log activity</h2>
-    <label class="field">Activity<select id="cKind">${ACTIVITIES.map(k => `<option>${k}</option>`).join('')}</select></label>
+    <label class="field">What did you do?<input id="cKind" maxlength="40" autocomplete="off" placeholder="Type anything, or tap one below"></label>
+    <div class="chips">${[...ACTIVITIES, ...typed].map(a => `<button class="chip" data-act="pickAct" data-v="${esc(a)}">${ACT_ICON[a] ? ACT_ICON[a] + ' ' : ''}${esc(a)}</button>`).join('')}</div>
     <div class="two" style="margin-top:12px"><label class="field">Minutes<input id="cMin" inputmode="numeric" placeholder="30"></label>
     <label class="field">Distance (${distUnit()})<input id="cDist" inputmode="decimal" placeholder="optional"></label></div>
     <label class="field">Date<input id="cDate" type="date" value="${ymd()}" max="${ymd()}"></label>
@@ -889,21 +909,30 @@ const actions = {
   addset(el) { const ex = D.active.exercises[el.dataset.e], l = ex.sets.at(-1); ex.sets.push({ reps: l ? l.reps : 10, weight: l ? l.weight : null, done: false }); save(); scrollKeep(render) },
   rmset(el) { D.active.exercises[el.dataset.e].sets.pop(); save(); scrollKeep(render) },
   addex() {
+    const names = [...new Set(D.workouts.filter(w => w.kind === 'strength').flatMap(w => w.exercises.map(e => e.n)))].sort();
     sheet(`<h2>Add an exercise</h2>
-      <label class="field">Name<input id="nxName" placeholder="e.g. Dumbbell curl"></label>
+      <label class="field">Name<input id="nxName" list="nxList" maxlength="40" autocomplete="off" placeholder="e.g. Muscle-up"></label>
+      <datalist id="nxList">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
       <div class="two" style="margin-top:12px"><label class="field">Sets<input id="nxSets" inputmode="numeric" value="3"></label>
-      <label class="field">Counted in<select id="nxU"><option value="reps">Reps</option><option value="sec">Seconds</option></select></label></div>
-      <label class="field"><select id="nxW"><option value="0">No weight</option><option value="1">With weight</option></select></label>
+      <label class="field">Reps per set<input id="nxReps" inputmode="numeric" placeholder="10"></label></div>
+      <div class="two"><label class="field">Counted in<select id="nxU"><option value="reps">Reps</option><option value="sec">Seconds</option></select></label>
+      <label class="field">Weight (${D.settings.unit})<input id="nxWt" inputmode="decimal" placeholder="none"></label></div>
+      <p class="muted small">Leave reps and weight blank on an exercise you've logged before to get a suggestion from last time.</p>
       <div class="row end"><button class="ghost" data-act="close">Cancel</button><button class="primary" data-act="saveEx">Add</button></div>`);
   },
   saveEx() {
     const n = $('#nxName').value.trim(); if (!n) { toast('Give it a name'); return }
-    const def = E(n, Math.min(10, Math.max(1, parseInt($('#nxSets').value) || 3)), 10, { u: $('#nxU').value, w: $('#nxW').value === '1' });
-    const last = lastExercise(n), s = suggest(def);
-    if (!last) s.sets.forEach(x => x.reps = def.u === 'sec' ? 30 : 10);
-    D.active.exercises.push({ n, u: def.u, w: def.w, t: '', hint: last ? s.hint : '', last: s.last || '', tr: s.sets[0].reps, ps: s.sets.length, sets: s.sets });
+    const sets = Math.min(10, Math.max(1, parseInt($('#nxSets').value) || 3)), reps = parseInt($('#nxReps').value), wt = num($('#nxWt').value), u = $('#nxU').value;
+    const last = lastExercise(n);
+    const def = E(n, sets, reps > 0 ? reps : u === 'sec' ? 30 : 10, { u, w: wt > 0 || !!(last && usesWeight(last)) });
+    const s = suggest(def), typed = reps > 0 || wt > 0 || !last;
+    // anything typed wins over the suggestion; a blank field falls back to it
+    const list = typed ? Array.from({ length: sets }, () => ({ reps: reps > 0 || !last ? def.r : s.sets[0].reps, weight: wt > 0 ? r1(wt) : s.sets[0].weight ?? null, done: false })) : s.sets;
+    D.active.exercises.push({ n, u, w: def.w, t: '', hint: typed ? '' : s.hint, last: s.last || '', tr: list[0].reps, ps: list.length, sets: list });
     save(); closeSheet(); render(); window.scrollTo(0, document.body.scrollHeight);
   },
+  allset(el) { D.active.exercises[el.dataset.e].sets.forEach(s => s.done = true); save(); scrollKeep(render) },
+  pickAct(el) { $('#cKind').value = el.dataset.v; document.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === el)) },
   finish() { finishWorkout() },
   discard() { if (confirm('Discard this workout? Nothing from it will be saved.')) { D.active = null; save(); stopRest(); stopWarm(); letSleep(); render() } },
   rest30() { restEnd += 30000; drawRest() },
@@ -921,8 +950,10 @@ const actions = {
   cardio() { cardioSheet(null) },
   saveCardio(el) {
     const mins = parseInt($('#cMin').value), date = $('#cDate').value || ymd(), dist = num($('#cDist').value);
+    const typed = $('#cKind').value.trim(), activity = ACTIVITIES.find(a => a.toLowerCase() === typed.toLowerCase()) || typed;
+    if (!activity) { toast('Type or tap what you did'); return }
     if (!(mins > 0)) { toast('Enter how many minutes'); return }
-    addWorkout({ id: uid(), kind: 'cardio', at: atFor(date), date, slot: date === ymd() && el.dataset.slot || null, activity: $('#cKind').value, minutes: mins, distance: dist && dist > 0 ? r1(dist) : null });
+    addWorkout({ id: uid(), kind: 'cardio', at: atFor(date), date, slot: date === ymd() && el.dataset.slot || null, activity, minutes: mins, distance: dist && dist > 0 ? r1(dist) : null });
     save(); closeSheet(); render(); toast('Logged 👍');
   },
   weight() { weightSheet() },
@@ -947,6 +978,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => {
   const el = e.target;
+  if (el.id === 'cuMin' && D.active) { D.active.mins = num(el.value); save(); return }
   if (el.dataset.f && D.active) { D.active.exercises[el.dataset.e].sets[el.dataset.s][el.dataset.f] = num(el.value); save() }
 });
 document.addEventListener('change', e => {
