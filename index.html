@@ -269,9 +269,10 @@ const SESSIONS = {
       { n: '90/90 hip switches', s: 60 },
       { n: 'Child’s pose — breathe', s: 60 }] },
   custom: { kind: 'strength', custom: true, icon: '✏️', name: 'Custom workout', sub: 'Your own exercises — type in sets, reps and weights', min: 20, ex: [] },
-  play: { kind: 'cardio', icon: '🏃', name: 'Get outside', sub: '20+ min easy: run, hike, bike — or play with the kids', min: 20 }
+  play: { kind: 'cardio', icon: '🌳', name: 'Get outside', sub: 'Rest day — no training. If you feel like it: an easy walk, hike or play with the kids', min: 20 }
 };
-// by weekday, Sunday first; null = rest. Sunday morning is always Get outside (see planned()).
+// by weekday, Sunday first; null = rest. Sunday morning is always Get outside, the rest day (see planned()).
+// Saturday morning is the custom workout: whatever you feel like.
 const SCHEDULE = [
   { am: 'play', pm: 'unwind' },
   { am: 'strA', pm: 'unwind' },
@@ -279,7 +280,7 @@ const SCHEDULE = [
   { am: 'strB', pm: 'unwind' },
   { am: 'eng2', pm: 'skill' },
   { am: 'strC', pm: 'unwind' },
-  { am: null, pm: 'unwind' }
+  { am: 'custom', pm: 'unwind' }
 ];
 const ACTIVITIES = ['Bouldering', 'Run', 'Walk', 'Hike', 'Bike', 'Row', 'Jump rope', 'Swim'];
 const FEEL = [['😌', 'Loose'], ['🙂', 'Good'], ['😐', 'Bit tight'], ['😣', 'Tight'], ['😖', 'Painful']];
@@ -319,19 +320,19 @@ const planned = (date, slot) => {
   return v === 'play' && !isSun(date) ? null : v;
 };
 // Doing `sid` today in place of what's planned: it takes today's spot and everything after it slides back a day
-// until the session's own later spot is filled (it's been pulled forward) or a rest day absorbs the shift.
+// until the session's own later spot is filled (it's been pulled forward) or a rest or custom day absorbs the shift. Sunday morning is skipped.
 // Returns true if any later day changed.
 function bumpPlan(slot, sid) {
   const dates = Array.from({ length: 15 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() + i); return ymd(d) });
   const set = (date, v) => { (D.plan[date] = D.plan[date] || {})[slot] = v };
   let carry = planned(dates[0], slot), moved = false;
   set(dates[0], sid);
-  if (pinned(dates[0], slot)) carry = null;   // swapping out Sunday's Get outside just changes today
+  if (pinned(dates[0], slot) || carry === 'custom') carry = null;   // swapping out Get outside or a custom day just changes today
   for (let i = 1; carry && i < dates.length; i++) {
     if (pinned(dates[i], slot)) continue;
     const old = planned(dates[i], slot);
     set(dates[i], carry); moved = true;
-    if (old === sid) break;
+    if (old === sid || old === 'custom') break;   // a custom day makes room, like a rest day
     carry = old;
   }
   for (const k of Object.keys(D.plan)) if (k < dates[0]) delete D.plan[k];
@@ -484,6 +485,7 @@ function onboardHTML() {
 /* ---------- today ---------- */
 function previewList(s) {
   if (s.kind === 'strength') return s.ex.map(exDef).map(e => `<li><span>${esc(e.n)}${e.ss ? ' <span class="tag">superset</span>' : ''}</span><span class="muted">${planText(e)}</span></li>`).join('');
+  if (s.custom) return `<li><span>Type in whatever you feel like doing — calisthenics, lifting, anything</span></li>`;
   if (s.about) return s.about.map(a => `<li><span>${esc(a)}</span></li>`).join('');
   if (s.steps) return [...new Set(s.steps.map(x => x.n))].map(n => `<li><span>${esc(n)}</span></li>`).join('');
   return '';
@@ -850,7 +852,7 @@ function settingsHTML() {
   <section class="card">
     <h2>Next 7 days</h2>
     <table class="sched">${upcoming.map((d, i) => `<tr><td>${i ? parseYmd(d).toLocaleDateString(undefined, { weekday: 'short' }) : 'Today'}</td><td>☀️ ${nm(planned(d, 'am'))}<br>🌙 ${nm(planned(d, 'pm'))}</td></tr>`).join('')}</table>
-    <p class="muted small">Pick a different session from the Today screen and everything after it slides back a day to make room (a rest day absorbs the shift). Going bouldering? Log it in place of Strength B.</p>
+    <p class="muted small">Pick a different session from the Today screen and everything after it slides back a day to make room (Saturday's custom day absorbs the shift, and Sunday stays your rest day). Going bouldering? Log it in place of Strength B.</p>
   </section>
   <section class="card">
     <h2>How it works</h2>
