@@ -90,6 +90,7 @@
   .bigclock span { font-size: 15px; font-weight: 500; color: var(--muted); }
   .warm { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .warm b { font-size: 44px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  a.howto { color: var(--accent); white-space: nowrap; }
   .pbar { height: 6px; background: var(--card2); border-radius: 3px; overflow: hidden; }
   .pbar i { display: block; height: 100%; background: var(--accent); width: 0; }
   .player.hard .pbar i { background: var(--hot); }
@@ -205,9 +206,10 @@ const repeat = (n, steps) => Array.from({ length: n }, (_, i) => typeof steps ==
 
 /* ---------- the program ----------
  * Two 15–20 minute sessions a day. Mornings: strength (supersets, so three or four lifts fit) or engine intervals.
- * Evenings: Unwind (hips, legs, low back — for days on the roof) or handstand skill work.
+ * Evenings: Low Back Ability — main Flow split into Flow A / Flow B, plus his Mobility Flow — or handstand skill work.
  * Built for: barbell + rack + bench, dumbbells, pull-up bar, rower, Echo bike, back extension, jump rope. */
-const E = (n, s, r, o = {}) => ({ n, s, r, u: o.u || 'reps', w: !!o.w, t: o.t || '', ss: !!o.ss, ladder: !!o.ladder });
+const E = (n, s, r, o = {}) => ({ n, s, r, u: o.u || 'reps', w: !!o.w, t: o.t || '', ss: !!o.ss, ladder: !!o.ladder, url: o.url || '' });
+const LBA = slug => `https://www.lowbackability.com/exercises/${slug}`;
 const LADDER = E('', 0, 0, { ladder: true });   // stands in for the current handstand push-up level
 const HSPU = [
   E('Pike push-up', 3, 8, { t: 'Hips high, lower the top of your head to the floor just in front of your hands.' }),
@@ -244,7 +246,34 @@ const SESSIONS = {
   eng2: { kind: 'timed', icon: '🔥', name: 'Engine: Bike & rope', sub: 'Echo bike + jump rope',
     about: ['4 min rope flow', '6 rounds: 20 s bike sprint · 40 s easy spin · 1 min jump rope', '2 min easy spin'],
     steps: [{ n: 'Rope flow — warm up', s: 240 }, ...repeat(6, [{ n: 'Echo bike — all out', s: 20, hard: true }, { n: 'Easy spin', s: 40, flow: true }, { n: 'Jump rope', s: 60 }]), { n: 'Easy spin — cool down', s: 120 }] },
-  unwind: { kind: 'timed', icon: '🧘', name: 'Unwind', sub: 'Hips, legs & low back',
+  // Low Back Ability's main session ("Flow"), split in two so each half fits an evening
+  flowA: { kind: 'strength', icon: '🦵', name: 'LBA Flow A', sub: 'Low Back Ability — legs & knees', min: 17, checkin: true,
+    ex: [E('Backward walk (sled warm-up)', 1, 60, { u: 'sec', t: 'No sled: walk backward, small steps, pushing through the balls of your feet. 10 m with a sled if you have one.', url: LBA('sled-warm-up') }),
+         E('Tibialis raise', 2, 25, { w: true, t: 'Back against a wall, heels out, lift your toes as high as you can.', url: LBA('tibialis-raise') }),
+         E('Deep calf raise', 2, 25, { w: true, t: 'Full stretch at the bottom off a step or plate.', url: LBA('deep-calf-raise') }),
+         E('Reverse step up', 2, 25, { w: true, t: 'Reps per side.', url: LBA('reverse-step-up') }),
+         E('Full range split squat', 2, 10, { w: true, t: 'Reps per side. Knee travels forward over the toes.', url: LBA('full-range-split-squats') })] },
+  flowB: { kind: 'strength', icon: '🏋️', name: 'LBA Flow B', sub: 'Low Back Ability — upper back & trunk', min: 15, checkin: true,
+    ex: [E('External rotation', 1, 15, { w: true, t: 'Reps per side. Light — band or small dumbbell.', url: LBA('external-rotation') }),
+         E('Pullover', 2, 15, { w: true, t: 'Dumbbell on the bench.', url: LBA('pullover') }),
+         E('Trap 3 raise', 2, 10, { w: true, t: 'Light dumbbells, chest on an incline bench.', url: LBA('trap-3-raise') }),
+         E('Back extension', 1, 120, { u: 'sec', w: true, t: 'Two minutes of continuous reps on the back extension.', url: LBA('back-extensions') }),
+         E('Hip flexor kick out', 2, 5, { t: 'Reps per side.', url: LBA('hip-flexor-kick-out') }),
+         E('Side bend', 2, 12, { w: true, t: 'Reps per side.', url: LBA('side-bend') })] },
+  // Low Back Ability's supporting session. Rep-based moves get a time slot: tap ⏭ when you finish early.
+  mobility: { kind: 'timed', icon: '🧘', name: 'LBA Mobility Flow', sub: 'Low Back Ability — hips & low back', checkin: true,
+    about: ['Couch stretch 2 × 1 min each side', 'Fire hydrants · hip abduction · 90/90 rotation — 10 each side', 'Outer hip dropset · pigeon strength', 'Deep squats 2 × 2 min', 'Loaded butterfly 2 × 1 min', 'Active hang 1 min'],
+    steps: [
+      ...repeat(2, [{ n: 'Couch stretch', s: 60, sides: true, url: LBA('couch-stretch') }]),
+      { n: 'Fire hydrants — 10 reps', s: 40, sides: true, t: 'Tap ⏭ when you’re done.', url: LBA('fire-hydrants') },
+      { n: 'Hip abduction — 10 reps', s: 40, sides: true, t: 'Tap ⏭ when you’re done.', url: LBA('hip-abduction') },
+      { n: '90/90 rotation — 10 reps', s: 45, sides: true, t: 'Tap ⏭ when you’re done.', url: LBA('90-90-rotation') },
+      { n: 'Outer hip dropset', s: 90, sides: true, t: 'One full dropset — see the how-to. Tap ⏭ when you’re done.', url: LBA('outer-hip-dropset') },
+      { n: 'Pigeon strength — 20 reps', s: 60, sides: true, t: 'Tap ⏭ when you’re done.', url: LBA('pigeon-strength') },
+      ...repeat(2, [{ n: 'Deep squat', s: 120, url: LBA('deep-squats') }]),
+      ...repeat(2, [{ n: 'Loaded butterfly', s: 60, t: 'A weight on each knee, let them sink.', url: LBA('loaded-butterfly') }]),
+      { n: 'Active hang', s: 60, url: LBA('active-hangs') }] },
+  unwind: { kind: 'timed', icon: '🌙', name: 'Unwind', sub: 'Hips, legs & low back (the original evening routine)', checkin: true,
     steps: [
       { n: 'Passive dead hang', s: 30, t: 'Relax and let your spine stretch out. Feet can touch a box if needed.' },
       { n: 'Cat-cow', s: 60, t: 'Slow, breathe into your back.' },
@@ -258,7 +287,7 @@ const SESSIONS = {
       { n: 'Bird dog', s: 60, t: 'Alternate sides slowly, hips level.' },
       { n: 'Side plank', s: 30, sides: true },
       { n: 'Child’s pose — breathe', s: 60, t: 'Long, slow exhales.' }] },
-  skill: { kind: 'timed', icon: '🤸', name: 'Skill: Handstand & flow', sub: 'Freestanding balance, rope flow, hips',
+  skill: { kind: 'timed', checkin: true, icon: '🤸', name: 'Skill: Handstand & flow', sub: 'Freestanding balance, rope flow, hips',
     about: ['4 min rope flow', 'Wrist warm-up & bail practice', '6 × 30 s freestanding balance', 'Hip stretches'],
     steps: [
       { n: 'Rope flow', s: 240 },
@@ -274,13 +303,13 @@ const SESSIONS = {
 // by weekday, Sunday first; null = rest. Sunday morning is always Get outside, the rest day (see planned()).
 // Saturday morning is the custom workout: whatever you feel like.
 const SCHEDULE = [
-  { am: 'play', pm: 'unwind' },
-  { am: 'strA', pm: 'unwind' },
+  { am: 'play', pm: 'mobility' },
+  { am: 'strA', pm: 'flowA' },
   { am: 'eng1', pm: 'skill' },
-  { am: 'strB', pm: 'unwind' },
+  { am: 'strB', pm: 'flowB' },
   { am: 'eng2', pm: 'skill' },
-  { am: 'strC', pm: 'unwind' },
-  { am: 'custom', pm: 'unwind' }
+  { am: 'strC', pm: 'flowA' },
+  { am: 'custom', pm: 'flowB' }
 ];
 const ACTIVITIES = ['Bouldering', 'Run', 'Walk', 'Hike', 'Bike', 'Row', 'Jump rope', 'Swim'];
 const FEEL = [['😌', 'Loose'], ['🙂', 'Good'], ['😐', 'Bit tight'], ['😣', 'Tight'], ['😖', 'Painful']];
@@ -292,10 +321,10 @@ const TIPS = [
   'At lunch on the roof: 30 seconds in a deep squat or a quick couch stretch against a ladder helps your back later.',
   'Short on time? Do just the first superset. Something beats nothing.',
   'Weigh in at the same time each morning and watch the trend, not the day.',
-  'Back tight after work? Do the Unwind first thing when you get home, before you sit down.',
+  'Back tight after work? Do your evening session first thing when you get home, before you sit down.',
   'Rope flow on a busy day still counts — a few minutes loosens up your shoulders and hips.'
 ];
-const roundsOf = sid => (SESSIONS[sid].steps || []).filter(x => x.hard).length;   // hard intervals / balance tries; 0 for Unwind
+const roundsOf = sid => (SESSIONS[sid].steps || []).filter(x => x.hard).length;   // hard intervals / balance tries; 0 for mobility sessions
 const minsOf = s => s.kind === 'timed' ? Math.round(s.steps.reduce((n, x) => n + x.s * (x.sides ? 2 : 1), 0) / 60) : s.min;
 const exDef = def => def.ladder ? { ...HSPU[D.hspu], ss: def.ss, ladder: true } : def;
 
@@ -341,6 +370,8 @@ function bumpPlan(slot, sid) {
 }
 // earlier versions could shift a session onto a future Sunday morning; Sunday is Get outside now
 for (const [k, o] of Object.entries(D.plan || {})) if (o && 'am' in o && isSun(k) && k > ymd()) delete o.am;
+// evenings moved to Low Back Ability: shifts made under the old Unwind schedule no longer line up
+if (!D.lbaEvenings) { for (const [k, o] of Object.entries(D.plan || {})) if (o && k > ymd()) delete o.pm; D.lbaEvenings = true; save() }
 function byDate(list, date, entry) { const out = list.filter(x => x.date !== date); out.push(entry); return out.sort((a, b) => a.date < b.date ? -1 : 1) }
 
 /* ---------- stats ---------- */
@@ -548,7 +579,7 @@ function begin(sid, slot) {
 function startWorkout(sid, slot) {
   D.active = {
     id: uid(), at: Date.now(), session: sid, slot,
-    exercises: SESSIONS[sid].ex.map(exDef).map(def => { const s = suggest(def); return { n: def.n, u: def.u, w: def.w, t: def.t, ss: def.ss, ladder: def.ladder, hint: s.hint, last: s.last || '', target: def.r, tr: s.tr, ps: s.sets.length, sets: s.sets } })
+    exercises: SESSIONS[sid].ex.map(exDef).map(def => { const s = suggest(def); return { n: def.n, u: def.u, w: def.w, t: def.t, url: def.url, ss: def.ss, ladder: def.ladder, hint: s.hint, last: s.last || '', target: def.r, tr: s.tr, ps: s.sets.length, sets: s.sets } })
   };
   save(); keepAwake(); go('today');
 }
@@ -560,7 +591,7 @@ function workoutHTML() {
       <div class="exhead"><h2>${esc(ex.n)}</h2><span class="muted small">${ex.sets.filter(s => s.done).length}/${ex.sets.length} sets</span></div>
       ${ex.ladder ? `<p class="tag">🤸 Handstand push-up level ${D.hspu + 1} of ${HSPU.length}</p>` : ''}
       ${ex.ss && a.exercises[i + 1] ? `<p class="tag">↕ Superset — alternate sets with ${esc(a.exercises[i + 1].n)}</p>` : ''}
-      ${ex.t ? `<p class="muted small">${esc(ex.t)}</p>` : ''}
+      ${ex.t || ex.url ? `<p class="muted small">${esc(ex.t)}${ex.url ? ` <a class="howto" href="${esc(ex.url)}" target="_blank" rel="noopener">How-to ↗</a>` : ''}</p>` : ''}
       ${ex.hint ? `<p class="hint">${esc(ex.hint)}</p>` : ''}
       ${ex.last ? `<p class="muted small">Last time: ${esc(ex.last)}</p>` : ''}
       <div>${ex.sets.map((s, j) => `<div class="set ${s.done ? 'done' : ''}">
@@ -601,14 +632,16 @@ function finishWorkout() {
   celebrate(`${sets} sets in ${minutes(w)} min`, [
     levelUp ? `🤸 Handstand level up! Next: ${levelUp}` : '',
     prs.length ? `New personal best: ${prs.join(', ')}` : ''
-  ]);
+  ], SESSIONS[w.session]?.checkin);
 }
-function celebrate(line, extras = []) {
+function celebrate(line, extras = [], askFeel = false) {
   const wk = weekCounts()[weekKey(new Date())] || 0;
   sheet(`<div class="celebrate"><div class="emoji">${wk >= D.settings.goal ? '🏆' : '💪'}</div><h2>Done!</h2>
     <p class="muted">${esc(line)} · ${wk} of ${D.settings.goal} this week</p>
     ${extras.filter(Boolean).map(x => `<p class="prs">${esc(x)}</p>`).join('')}
-    <button class="primary wide" data-act="close">Nice</button></div>`);
+    ${askFeel ? `<p style="margin-top:16px">How do your hips and low back feel today?</p>
+      <div class="feel">${FEEL.map(([e, l], i) => `<button data-act="checkin" data-v="${i + 1}"><b>${e}</b>${l}</button>`).join('')}</div>
+      <button class="link" data-act="close">Skip</button>` : '<button class="primary wide" data-act="close">Nice</button>'}</div>`);
 }
 
 /* ---------- rest timer (between strength sets) ---------- */
@@ -686,7 +719,7 @@ function playerHTML() {
     ${st.ready ? `<p class="pstep"><b>${esc(shown.n)}</b></p>` : ''}
     <p class="ptime" id="pTime">${mmss(left)}</p>
     <div class="pbar"><i id="pBar" style="width:${100 * (st.s - left) / st.s}%"></i></div>
-    ${shown.t ? `<p class="muted">${esc(shown.t)}</p>` : ''}
+    ${shown.t || shown.url ? `<p class="muted">${esc(shown.t || '')}${shown.url ? ` <a class="howto" href="${esc(shown.url)}" target="_blank" rel="noopener">How-to ↗</a>` : ''}</p>` : ''}
     <p class="muted small">${st.ready ? 'Starts when the countdown ends' : next ? `Next: ${esc(next.n)}` : 'Last one!'}</p>
     <div class="pctl"><button data-act="pprev" aria-label="Previous step">⏮</button><button class="primary" data-act="ppause">${P.paused ? '▶ Resume' : '❚❚ Pause'}</button><button data-act="pnext" aria-label="Next step">⏭</button></div>
   </section>
@@ -701,7 +734,7 @@ function finishTimed(complete, opts = {}) {
   addWorkout({ id: uid(), kind: 'timed', session: p.sid, slot: p.slot, at: p.at, end: Date.now(), date: ymd(p.at), minutes: Math.max(1, mins),
     complete: complete || (total > 0 && rounds >= total), ...(total ? { rounds, roundsTotal: total } : {}) });
   save(); tab = 'today'; render();
-  if (p.sid === 'unwind' || p.sid === 'skill') checkinSheet(true);
+  if (SESSIONS[p.sid].checkin) checkinSheet(true);
   else { beep(1046, 0.6); celebrate(`${Math.max(1, mins)} min`) }
 }
 // Ending early: save what was done, with rounds and minutes you can correct
@@ -884,7 +917,7 @@ function settingsHTML() {
     <h2>How it works</h2>
     <p class="muted small"><b>Strength</b> pairs exercises in supersets so you get three or four lifts done in 20 minutes. Lift with one or two reps left in the tank — you still have to work. When you hit every set, the next session asks for a rep more; at the top of the rep range it adds a set, and loaded lifts then go up in weight. Miss twice in a row at the same load and it eases you back (about 10% lighter) to rebuild. You can switch to simple progression in Settings.</p>
     <p class="muted small"><b>Engine</b> intervals on the rower and Echo bike build the fitness to run around with your kids and recover between climbs.</p>
-    <p class="muted small"><b>Unwind</b> works the hip flexors, hamstrings and glutes that tighten up from squatting and kneeling on a roof and pull on your low back. Following Low Back Ability’s approach, your back is trained rather than protected: seated good mornings and back extensions get slowly heavier, and Jefferson curls build comfort bending forward. Bird dogs and side planks add endurance.</p>
+    <p class="muted small"><b>Evenings: Low Back Ability.</b> His main Flow is split into Flow A (legs & knees) and Flow B (upper back & trunk), twice a week each, and his Mobility Flow is on Sunday. Each exercise links to his how-to page. Your back is trained rather than protected, with the load going up slowly. Seated good mornings in the mornings add to it. The original Unwind is still in Swap.</p>
     <p class="muted small"><b>Climbing</b>: pull-ups, dead hangs, hanging knee raises and hollow holds build pulling, grip and core strength.</p>
     <p class="muted small"><b>Freestanding handstand push-up</b>: a ${HSPU.length}-step ladder on Strength A and C. The wall steps build the pressing strength, while Tuesday and Thursday evenings train the balance from day one, so both are ready by the time you reach the freestanding steps.</p>
     <p class="muted small">If back pain is sharp, runs down a leg, or isn't getting better after a few weeks, get it checked by a physio.</p>
@@ -995,7 +1028,7 @@ const actions = {
     }
     save(); closeSheet(); render(); toast(old ? 'Updated' : 'Logged 👍');
   },
-  checkin(el) { D.checkins = byDate(D.checkins, ymd(), { date: ymd(), v: +el.dataset.v }); save(); closeSheet(); render(); toast(+el.dataset.v >= 4 ? 'Noted — take it easy, and do the Unwind again tomorrow' : 'Noted 👍') },
+  checkin(el) { D.checkins = byDate(D.checkins, ymd(), { date: ymd(), v: +el.dataset.v }); save(); closeSheet(); render(); toast(+el.dataset.v >= 4 ? 'Noted — take it easy, and do the Mobility Flow tomorrow' : 'Noted 👍') },
   checkinNow() { checkinSheet(false) },
   cardio() { cardioSheet(null) },
   saveCardio(el) {
