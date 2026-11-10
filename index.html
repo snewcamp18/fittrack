@@ -295,6 +295,7 @@ const TIPS = [
   'Back tight after work? Do the Unwind first thing when you get home, before you sit down.',
   'Rope flow on a busy day still counts — a few minutes loosens up your shoulders and hips.'
 ];
+const roundsOf = sid => (SESSIONS[sid].steps || []).filter(x => x.hard).length;   // hard intervals / balance tries; 0 for Unwind
 const minsOf = s => s.kind === 'timed' ? Math.round(s.steps.reduce((n, x) => n + x.s * (x.sides ? 2 : 1), 0) / 60) : s.min;
 const exDef = def => def.ladder ? { ...HSPU[D.hspu], ss: def.ss, ladder: true } : def;
 
@@ -500,6 +501,7 @@ function slotCard(slot, sid) {
     <ul class="plan">${previewList(s)}</ul>
     ${done ? '' : `<button class="primary wide" data-act="begin" data-sid="${sid}" data-slot="${slot}">Start</button>`}
     <button class="link" data-act="swap" data-slot="${slot}">${done ? 'Do another session' : 'Swap for another session'}</button>
+    ${!done && s.kind === 'timed' ? `<button class="link" data-act="logPast" data-sid="${sid}" data-slot="${slot}" style="margin-left:16px">Did it without the timer?</button>` : ''}
   </section>`;
 }
 function todayHTML() {
@@ -690,16 +692,39 @@ function playerHTML() {
   </section>
   <ol class="steps">${P.steps.map((x, i) => x.ready ? '' : `<li class="${i < cur ? 'past' : i === cur ? 'cur' : ''}"><span>${esc(x.n)}</span><span>${mmss(x.s)}</span></li>`).join('')}</ol>`;
 }
-function finishTimed(complete) {
+function finishTimed(complete, opts = {}) {
   clearInterval(pTick); pTick = null; letSleep();
   const p = P; P = null;
-  const mins = Math.round((Date.now() - p.at) / 60000);
+  const mins = opts.mins ?? Math.round((Date.now() - p.at) / 60000), total = roundsOf(p.sid);
   if (!complete && mins < 1) { render(); toast('Session ended'); return }
-  addWorkout({ id: uid(), kind: 'timed', session: p.sid, slot: p.slot, at: p.at, end: Date.now(), date: ymd(p.at), minutes: Math.max(1, mins), complete });
+  const rounds = complete ? total : opts.rounds ?? 0;
+  addWorkout({ id: uid(), kind: 'timed', session: p.sid, slot: p.slot, at: p.at, end: Date.now(), date: ymd(p.at), minutes: Math.max(1, mins),
+    complete: complete || (total > 0 && rounds >= total), ...(total ? { rounds, roundsTotal: total } : {}) });
   save(); tab = 'today'; render();
   if (p.sid === 'unwind' || p.sid === 'skill') checkinSheet(true);
   else { beep(1046, 0.6); celebrate(`${Math.max(1, mins)} min`) }
 }
+// Ending early: save what was done, with rounds and minutes you can correct
+function endSheet() {
+  const total = roundsOf(P.sid), done = P.steps.slice(0, P.i).filter(x => x.hard).length;
+  sheet(`<h2>End session?</h2><p class="muted">Save what you did — fix the numbers if they're not quite right.</p>
+    <div class="two" style="margin-top:12px">${total ? `<label class="field">Rounds done (of ${total})<input id="eRounds" inputmode="numeric" value="${done}"></label>` : ''}
+    <label class="field">Minutes<input id="eMin" inputmode="numeric" value="${Math.max(1, Math.round((Date.now() - P.at) / 60000))}"></label></div>
+    <div class="row end"><button class="ghost" data-act="close">Keep going</button><button class="danger" data-act="pdiscard">Discard</button><button class="primary" data-act="psaveEnd">Save</button></div>`);
+}
+// Logging a timed session after the fact (no timer), or correcting one already in history
+function logSheet(id, slot, pick) {
+  const w = id && D.workouts.find(x => x.id === id), sid = w ? w.session : pick || 'eng1', total = roundsOf(sid);
+  sheet(`<h2>${w ? 'Edit session' : 'Log a session'}</h2>
+    <label class="field">Session<select id="lSid" ${w ? '' : 'data-fresh="1"'}>${Object.entries(SESSIONS).filter(([, s]) => s.kind === 'timed').map(([k, s]) => `<option value="${k}" ${k === sid ? 'selected' : ''}>${s.icon} ${esc(s.name)}</option>`).join('')}</select></label>
+    <div class="two" style="margin-top:12px"><label class="field" id="lRoundsBox">Rounds done (of <span id="lTotal">${total}</span>)<input id="lRounds" inputmode="numeric" value="${w ? w.rounds ?? (w.complete === false ? '' : total) : total}" placeholder="${total}"></label>
+    <label class="field">Minutes<input id="lMin" inputmode="numeric" value="${w ? w.minutes : minsOf(SESSIONS[sid])}"></label></div>
+    <label class="field">Date<input id="lDate" type="date" value="${w ? w.date : ymd()}" max="${ymd()}"></label>
+    <div class="row end"><button class="ghost" data-act="close">Cancel</button><button class="primary" data-act="saveLog" data-id="${w ? esc(w.id) : ''}" data-slot="${slot || ''}">Save</button></div>`);
+  syncRounds();
+}
+function syncRounds() { const t = roundsOf($('#lSid').value); $('#lRoundsBox').style.display = t ? '' : 'none'; $('#lTotal').textContent = t }
+
 function checkinSheet(afterSession) {
   sheet(`<div class="celebrate">${afterSession ? '<div class="emoji">🧘</div><h2>Done!</h2>' : ''}
     <p>How do your hips and low back feel today?</p>
@@ -737,20 +762,21 @@ function workoutTitle(w) {
 }
 function workoutSummary(w) {
   if (w.kind === 'cardio') return `${w.minutes} min${w.distance ? ` · ${w.distance} ${distUnit()}` : ''}`;
-  if (w.kind === 'timed') return `${w.minutes} min${w.complete === false ? ' · ended early' : ''}`;
+  if (w.kind === 'timed') return `${w.minutes} min${w.roundsTotal ? ` · ${w.rounds}/${w.roundsTotal} rounds` : w.complete === false ? ' · ended early' : ''}`;
   const sets = w.exercises.reduce((n, e) => n + e.sets.length, 0);
   return `${w.exercises.length} exercises · ${sets} sets · ${minutes(w)} min`;
 }
 function historyHTML() {
-  if (!D.workouts.length) return `<header class="top"><h1>History</h1></header><div class="card empty"><p>Nothing logged yet.</p><p class="muted small" style="margin-top:6px">Finish your first session and it shows up here.</p></div>`;
-  let out = `<header class="top"><h1>History</h1><p class="muted">${D.workouts.length} total</p></header>`, lastWeek = null;
+  const logBtn = '<button class="ghost small" data-act="logPast">+ Log a session</button>';
+  if (!D.workouts.length) return `<header class="top"><h1>History</h1>${logBtn}</header><div class="card empty"><p>Nothing logged yet.</p><p class="muted small" style="margin-top:6px">Finish your first session and it shows up here.</p></div>`;
+  let out = `<header class="top"><div><h1>History</h1><p class="muted">${D.workouts.length} total</p></div>${logBtn}</header>`, lastWeek = null;
   const counts = weekCounts();
   for (const w of [...D.workouts].reverse()) {
     const wk = weekKey(parseYmd(w.date));
     if (wk !== lastWeek) { lastWeek = wk; out += `<p class="weekhead">Week of ${shortDate(parseYmd(wk))} · ${counts[wk]} session${counts[wk] === 1 ? '' : 's'}</p>` }
     out += `<details class="card"><summary><div><b>${workoutTitle(w)}</b><span class="muted small">${fmtDate(w.date)}${w.slot ? ` · ${w.slot === 'am' ? 'morning' : 'evening'}` : ''} · ${workoutSummary(w)}</span></div></summary>
       ${w.kind === 'strength' ? `<ul class="exlines">${w.exercises.map(e => `<li><span>${esc(e.n)}</span><span>${e.sets.map(s => setText(s, e.u)).join(', ')}</span></li>`).join('')}</ul>` : ''}
-      <div class="row end"><button class="danger small" data-act="delw" data-id="${esc(w.id)}">Delete</button></div></details>`;
+      <div class="row end">${w.kind === 'timed' ? `<button class="ghost small" data-act="editLog" data-id="${esc(w.id)}">Edit</button>` : ''}<button class="danger small" data-act="delw" data-id="${esc(w.id)}">Delete</button></div></details>`;
   }
   return out;
 }
@@ -946,7 +972,29 @@ const actions = {
   },
   pnext() { stepTo(P.i + 1) },
   pprev() { stepTo(stepLeft() < P.steps[P.i].s - 3 ? P.i : P.i - 1) },
-  pquit() { if (confirm('End this session now? The time you did still counts.')) finishTimed(false) },
+  pquit() { endSheet() },
+  pdiscard() { if (!confirm('Discard this session? Nothing from it will be saved.')) return; clearInterval(pTick); pTick = null; P = null; letSleep(); closeSheet(); render(); toast('Session discarded') },
+  psaveEnd() {
+    const total = roundsOf(P.sid), rounds = Math.min(total, Math.max(0, parseInt($('#eRounds')?.value) || 0)), mins = Math.max(1, parseInt($('#eMin').value) || 1);
+    closeSheet(); finishTimed(false, { rounds, mins });
+  },
+  logPast(el) { logSheet(null, el.dataset.slot, el.dataset.sid) },
+  editLog(el) { logSheet(el.dataset.id) },
+  saveLog(el) {
+    const sid = $('#lSid').value, date = $('#lDate').value || ymd(), mins = parseInt($('#lMin').value), total = roundsOf(sid);
+    if (!(mins > 0)) { toast('Enter how many minutes'); return }
+    const rounds = Math.min(total, Math.max(0, parseInt($('#lRounds').value) || 0));
+    const fields = { session: sid, date, minutes: mins, complete: !total || rounds >= total, ...(total ? { rounds, roundsTotal: total } : { rounds: undefined, roundsTotal: undefined }) };
+    const old = el.dataset.id && D.workouts.find(w => w.id === el.dataset.id);
+    if (old) {
+      if (old.date !== date) { old.at = atFor(date); old.slot = null }
+      Object.assign(old, fields, { end: old.at + mins * 60000 }); D.workouts.sort((a, b) => a.at - b.at);
+    } else {
+      const at = atFor(date);
+      addWorkout({ id: uid(), kind: 'timed', at, end: at + mins * 60000, slot: date === ymd() && el.dataset.slot || null, ...fields });
+    }
+    save(); closeSheet(); render(); toast(old ? 'Updated' : 'Logged 👍');
+  },
   checkin(el) { D.checkins = byDate(D.checkins, ymd(), { date: ymd(), v: +el.dataset.v }); save(); closeSheet(); render(); toast(+el.dataset.v >= 4 ? 'Noted — take it easy, and do the Unwind again tomorrow' : 'Noted 👍') },
   checkinNow() { checkinSheet(false) },
   cardio() { cardioSheet(null) },
@@ -986,6 +1034,7 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const el = e.target;
   if (el.id === 'exSel') { selEx = el.value; render(); return }
+  if (el.id === 'lSid') { syncRounds(); if (el.dataset.fresh) { $('#lRounds').value = roundsOf(el.value); $('#lMin').value = minsOf(SESSIONS[el.value]) } return }
   if (el.id === 'importFile' && el.files[0]) {
     el.files[0].text().then(txt => {
       const d = JSON.parse(txt);
