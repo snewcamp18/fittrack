@@ -299,6 +299,15 @@ const SESSIONS = {
       { n: 'Couch stretch', s: 60, sides: true },
       { n: '90/90 hip switches', s: 60 },
       { n: 'Child’s pose — breathe', s: 60 }] },
+  // Every other Thursday in place of Bike & rope (see zone2Week): easy aerobic base work, indoors
+  zone2: { kind: 'timed', icon: '💚', name: 'Zone 2 ride', sub: 'Easy indoor ride — Echo bike or rower', cals: 'monitor',
+    about: ['2 min easy warm-up', '20 min steady — easy enough to hold a conversation', '2 min cool-down'],
+    steps: [{ n: 'Easy warm-up', s: 120, t: 'Start very easy and let your heart rate come up gradually.' },
+      ...['Steady and easy — you should be able to hold a conversation. Breathing through your nose is a good check.',
+          'Still able to talk in full sentences? If not, ease off. Easy is the point.',
+          'Keep the pace even. Don’t let it creep up.',
+          'Last block. Same steady pace to the end.'].map((t, i) => ({ n: `Zone 2 — block ${i + 1} of 4`, s: 300, flow: true, t })),
+      { n: 'Easy cool-down', s: 120, flow: true }] },
   // Optional: max hangs on a board at the gym, or lifts with a loading block at home. Not on the schedule; pick it from Swap.
   fingers: { kind: 'timed', icon: '🖐️', name: 'Fingerboard', sub: 'Max hangs — gym board or lifting block · 1–2× a week, never on tender fingers', fb: true,
     about: ['3 min warm-up hangs on a big edge', '6 × 10 s hangs, 2 min rest', 'About 3 s left in the tank on every hang'],
@@ -352,8 +361,11 @@ function addWorkout(w) { D.workouts.push(w); D.workouts.sort((a, b) => a.at - b.
 // Sunday morning is pinned to Get outside: shifts skip over it, and Get outside never lands on another day.
 const isSun = date => parseYmd(date).getDay() === 0;
 const pinned = (date, slot) => slot === 'am' && isSun(date);
+// Thursday mornings alternate: Zone 2 ride one week, Bike & rope the next (Zone 2 weeks counted from Mon 16 Nov 2026)
+const zone2Week = date => Math.round((monday(parseYmd(date)) - new Date(2026, 10, 16)) / 6048e5) % 2 === 0;
 const planned = (date, slot) => {
-  const o = D.plan[date], v = o && slot in o ? o[slot] : SCHEDULE[parseYmd(date).getDay()][slot];
+  const o = D.plan[date], def = SCHEDULE[parseYmd(date).getDay()][slot];
+  const v = o && slot in o ? o[slot] : def === 'eng2' && zone2Week(date) ? 'zone2' : def;
   return v === 'play' && !isSun(date) ? null : v;
 };
 // Doing `sid` today in place of what's planned: it takes today's spot and everything after it slides back a day
@@ -943,7 +955,7 @@ function progressHTML() {
     ${barChart(weeks.map(d => counts[ymd(d)] || 0), weeks.map(d => `${d.getMonth() + 1}/${d.getDate()}`), s.goal)}
   </section>
   <section class="card">
-    <div class="exhead"><h2>🔥 Engine calories</h2><select id="calSel" aria-label="Engine session" style="width:auto">${['eng1', 'eng2'].map(k => `<option value="${k}" ${k === selCal ? 'selected' : ''}>${esc(SESSIONS[k].name.replace('Engine: ', ''))}</option>`).join('')}</select></div>
+    <div class="exhead"><h2>🔥 Engine calories</h2><select id="calSel" aria-label="Engine session" style="width:auto">${['eng1', 'eng2', 'zone2'].map(k => `<option value="${k}" ${k === selCal ? 'selected' : ''}>${esc(SESSIONS[k].name.replace('Engine: ', ''))}</option>`).join('')}</select></div>
     ${(() => { const h = D.workouts.filter(w => w.session === selCal && w.cal > 0); return h.length
       ? `<p class="muted small">Last ${h.at(-1).cal} cal · best ${Math.max(...h.map(w => w.cal))} · ${h.length} logged</p>${lineChart(h.map(w => ({ x: w.at, y: w.cal })), 'Calories per session')}`
       : '<p class="muted small empty">Enter the calories from the monitor when you finish a session.</p>' })()}
