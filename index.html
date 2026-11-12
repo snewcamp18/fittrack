@@ -299,6 +299,11 @@ const SESSIONS = {
       { n: 'Couch stretch', s: 60, sides: true },
       { n: '90/90 hip switches', s: 60 },
       { n: 'Child’s pose — breathe', s: 60 }] },
+  // Optional: max hangs on a board at the gym, or lifts with a loading block at home. Not on the schedule; pick it from Swap.
+  fingers: { kind: 'timed', icon: '🖐️', name: 'Fingerboard', sub: 'Max hangs — gym board or lifting block · 1–2× a week, never on tender fingers', fb: true,
+    about: ['3 min warm-up hangs on a big edge', '6 × 10 s hangs, 2 min rest', 'About 3 s left in the tank on every hang'],
+    steps: [{ n: 'Warm-up hangs — big edge, light', s: 180, t: 'Easy 5–7 s hangs on a big edge, building up gradually. Stop if anything feels tweaky.' },
+      ...repeat(6, () => [{ n: 'Hang', s: 10, hard: true, t: 'Half crimp or open hand, never full crimp. Use a load you could hold about 3 s longer.' }, { n: 'Rest', s: 120, flow: true, t: 'Shake out and stay warm.' }]).slice(0, -1)] },
   custom: { kind: 'strength', custom: true, icon: '✏️', name: 'Custom workout', sub: 'Your own exercises — type in sets, reps and weights', min: 20, ex: [] },
   play: { kind: 'cardio', icon: '🌳', name: 'Get outside', sub: 'Rest day — no training. If you feel like it: an easy walk, hike or play with the kids', min: 20 }
 };
@@ -532,6 +537,7 @@ function slotCard(slot, sid) {
     <div class="exhead"><p class="eyebrow">${label} · ~${minsOf(s)} min</p>${done ? '<span class="donetag">✓ Done</span>' : ''}</div>
     <h2>${s.icon} ${esc(s.name)}</h2><p class="muted small">${esc(s.sub)}</p>
     ${s.cals && calTarget(sid) ? `<p class="hint">🎯 Last time ${calTarget(sid).last} cal · best ${calTarget(sid).best}</p>` : ''}
+    ${s.fb && fbNext() ? `<p class="hint">🎯 ${esc(fbText(fbNext()))} (${fbNext().why})</p>` : ''}
     <ul class="plan">${previewList(s)}</ul>
     ${done ? '' : `<button class="primary wide" data-act="begin" data-sid="${sid}" data-slot="${slot}">Start</button>`}
     <button class="link" data-act="swap" data-slot="${slot}">${done ? 'Do another session' : 'Swap for another session'}</button>
@@ -717,7 +723,7 @@ function playerHTML() {
   const cur = st.ready ? P.i + 1 : P.i, shown = st.ready ? st.next : st;
   const next = P.steps.slice(cur + 1).find(x => !x.ready);
   const stepNo = P.steps.slice(0, cur + 1).filter(x => !x.ready).length, stepTotal = P.steps.filter(x => !x.ready).length;
-  return `<header class="top"><div><p class="eyebrow">${s.icon} ${esc(s.name)}</p><p class="bigclock"><b id="pLeft">${mmss(totalLeft())}</b> <span>left · step ${stepNo} of ${stepTotal}</span></p>${s.cals && calTarget(P.sid) ? `<p class="hint">🎯 Beat ${calTarget(P.sid).last} cal (best ${calTarget(P.sid).best})</p>` : ''}</div><button class="ghost small" data-act="pquit">End</button></header>
+  return `<header class="top"><div><p class="eyebrow">${s.icon} ${esc(s.name)}</p><p class="bigclock"><b id="pLeft">${mmss(totalLeft())}</b> <span>left · step ${stepNo} of ${stepTotal}</span></p>${s.cals && calTarget(P.sid) ? `<p class="hint">🎯 Beat ${calTarget(P.sid).last} cal (best ${calTarget(P.sid).best})</p>` : ''}${s.fb && fbNext() ? `<p class="hint">🎯 ${esc(fbText(fbNext()))}</p>` : ''}</div><button class="ghost small" data-act="pquit">End</button></header>
   <section class="card player ${st.ready ? 'ready' : st.hard ? 'hard' : ''}">
     <h1 class="pstep">${st.ready ? 'Get ready' : esc(st.n)}</h1>
     ${st.ready ? `<p class="pstep"><b>${esc(shown.n)}</b></p>` : ''}
@@ -740,6 +746,7 @@ function finishTimed(complete, opts = {}) {
   addWorkout(w); save(); tab = 'today'; render();
   if (SESSIONS[p.sid].checkin) checkinSheet(true);
   else if (SESSIONS[p.sid].cals && !('cal' in opts)) { beep(1046, 0.6); calSheet(w.id) }
+  else if (SESSIONS[p.sid].fb) { beep(1046, 0.6); fbSheet(w.id) }
   else { beep(1046, 0.6); celebrate(`${w.minutes} min`, [w.cal ? calLine(w) : '']) }
 }
 // Ending early: save what was done, with rounds and minutes you can correct
@@ -771,6 +778,31 @@ function calLine(w) {
   if (!last) return `${w.cal} cal — your first one logged. Beat it next time!`;
   const diff = w.cal - last.cal, best = w.cal > Math.max(...prev.map(x => x.cal)) ? ' · new best!' : '';
   return diff > 0 ? `🔥 ${w.cal} cal — ${diff} more than last time${best}` : diff < 0 ? `${w.cal} cal — ${-diff} fewer than last time (${last.cal})` : `${w.cal} cal — same as last time`;
+}
+/* Fingerboard: each session records setup (board / block), edge, grip, load and how it felt, and suggests the next load.
+ * Board load is added (+) or taken off (−) bodyweight; block load is the weight lifted. Tendons adapt slowly, so steps are small. */
+const FB_FEEL = ['Too easy (5+ s left)', 'About right (~3 s left)', 'Hard (barely held)'];
+const fbLast = () => D.workouts.filter(w => w.fb).at(-1)?.fb;
+const fbStep = () => D.settings.unit === 'kg' ? 2 : 5;
+const fbLoad = (fb, unit = D.settings.unit) => fb.setup === 'block' ? `${fb.load} ${unit} lifted` : fb.load > 0 ? `+${fb.load} ${unit}` : fb.load < 0 ? `${-fb.load} ${unit} assisted` : 'bodyweight';
+const fbText = fb => `${fb.edge} mm ${fb.grip.toLowerCase()} · ${fbLoad(fb)}`;
+function fbNext() {
+  const fb = fbLast(); if (!fb) return null;
+  const load = fb.feel === 1 ? fb.load + fbStep() : fb.feel === 3 ? fb.load - fbStep() : fb.load;
+  const why = fb.feel === 1 ? 'felt easy last time' : fb.feel === 3 ? 'was hard last time' : 'felt right last time — repeat it';
+  return { ...fb, load, why };
+}
+function fbSheet(id) {
+  const w = D.workouts.find(x => x.id === id), f = w.fb || fbNext() || { setup: 'board', edge: 20, grip: 'Half crimp', load: 0, feel: 2 }, unit = D.settings.unit;
+  const opt = (v, cur) => `<option ${v === cur ? 'selected' : ''}>${v}</option>`;
+  sheet(`<div class="celebrate"><div class="emoji">🖐️</div><h2>${w.fb ? 'Hang details' : 'Done!'}</h2><p>What did you hang today?</p></div>
+    <div class="two" style="margin-top:12px"><label class="field">Setup<select id="fbSetup"><option value="board" ${f.setup === 'board' ? 'selected' : ''}>Board</option><option value="block" ${f.setup === 'block' ? 'selected' : ''}>Lifting block</option></select></label>
+    <label class="field">Grip<select id="fbGrip">${opt('Half crimp', f.grip)}${opt('Open hand', f.grip)}</select></label></div>
+    <div class="two"><label class="field">Edge (mm)<input id="fbEdge" inputmode="numeric" value="${f.edge}"></label>
+    <label class="field">Load (${unit})<input id="fbLoadIn" inputmode="decimal" value="${f.load}"></label></div>
+    <p class="muted small">Board: weight added (e.g. 10) or taken off with a band or feet (e.g. -15); 0 = bodyweight. Block: the weight lifted.</p>
+    <label class="field">How did it feel?<select id="fbFeel">${FB_FEEL.map((l, i) => `<option value="${i + 1}" ${i + 1 === (w.fb ? f.feel : 2) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <div class="row end">${w.fb ? '<button class="ghost" data-act="close">Cancel</button>' : `<button class="ghost" data-act="fbSave" data-id="${esc(id)}" data-skip="1">Skip</button>`}<button class="primary" data-act="fbSave" data-id="${esc(id)}">Save</button></div>`);
 }
 function calSheet(id) {
   const w = D.workouts.find(x => x.id === id), t = calTarget(w.session);
@@ -819,7 +851,7 @@ function workoutTitle(w) {
 }
 function workoutSummary(w) {
   if (w.kind === 'cardio') return `${w.minutes} min${w.distance ? ` · ${w.distance} ${distUnit()}` : ''}`;
-  if (w.kind === 'timed') return `${w.minutes} min${w.roundsTotal ? ` · ${w.rounds}/${w.roundsTotal} rounds` : w.complete === false ? ' · ended early' : ''}${w.cal ? ` · ${w.cal} cal` : ''}`;
+  if (w.kind === 'timed') return `${w.minutes} min${w.roundsTotal ? ` · ${w.rounds}/${w.roundsTotal} rounds` : w.complete === false ? ' · ended early' : ''}${w.cal ? ` · ${w.cal} cal` : ''}${w.fb ? ` · ${fbText(w.fb)}` : ''}`;
   const sets = w.exercises.reduce((n, e) => n + e.sets.length, 0);
   return `${w.exercises.length} exercises · ${sets} sets · ${minutes(w)} min`;
 }
@@ -833,7 +865,7 @@ function historyHTML() {
     if (wk !== lastWeek) { lastWeek = wk; out += `<p class="weekhead">Week of ${shortDate(parseYmd(wk))} · ${counts[wk]} session${counts[wk] === 1 ? '' : 's'}</p>` }
     out += `<details class="card"><summary><div><b>${workoutTitle(w)}</b><span class="muted small">${fmtDate(w.date)}${w.slot ? ` · ${w.slot === 'am' ? 'morning' : 'evening'}` : ''} · ${workoutSummary(w)}</span></div></summary>
       ${w.kind === 'strength' ? `<ul class="exlines">${w.exercises.map(e => `<li><span>${esc(e.n)}</span><span>${e.sets.map(s => setText(s, e.u)).join(', ')}</span></li>`).join('')}</ul>` : ''}
-      <div class="row end">${w.kind === 'timed' ? `<button class="ghost small" data-act="editLog" data-id="${esc(w.id)}">Edit</button>` : ''}<button class="danger small" data-act="delw" data-id="${esc(w.id)}">Delete</button></div></details>`;
+      <div class="row end">${w.fb || SESSIONS[w.session]?.fb ? `<button class="ghost small" data-act="editFb" data-id="${esc(w.id)}">Hang details</button>` : ''}${w.kind === 'timed' ? `<button class="ghost small" data-act="editLog" data-id="${esc(w.id)}">Edit</button>` : ''}<button class="danger small" data-act="delw" data-id="${esc(w.id)}">Delete</button></div></details>`;
   }
   return out;
 }
@@ -916,6 +948,13 @@ function progressHTML() {
       ? `<p class="muted small">Last ${h.at(-1).cal} cal · best ${Math.max(...h.map(w => w.cal))} · ${h.length} logged</p>${lineChart(h.map(w => ({ x: w.at, y: w.cal })), 'Calories per session')}`
       : '<p class="muted small empty">Enter the calories from the monitor when you finish a session.</p>' })()}
   </section>
+  ${(() => {
+    const all = D.workouts.filter(w => w.fb); if (!all.length) return '';
+    const k = all.at(-1).fb, same = all.filter(w => w.fb.setup === k.setup && w.fb.edge === k.edge && w.fb.grip === k.grip);
+    return `<section class="card"><div class="exhead"><h2>🖐️ Finger strength</h2><span class="muted small">${all.length} session${all.length === 1 ? '' : 's'}</span></div>
+      <p class="muted small">${esc(`${k.edge} mm ${k.grip.toLowerCase()} on the ${k.setup === 'block' ? 'lifting block' : 'board'}`)} · now ${esc(fbLoad(k))}${k.setup === 'board' ? ' (+ added, − assisted)' : ''}</p>
+      ${lineChart(same.map(w => ({ x: w.at, y: w.fb.load })), 'Fingerboard load over time')}</section>`;
+  })()}
   <section class="card">
     <h2>Strength</h2>
     ${names.length ? `<select id="exSel" aria-label="Exercise">${names.map(n => `<option ${n === selEx ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
@@ -965,6 +1004,7 @@ function convertUnits(to) {
   D.weights.forEach(w => w.v = r1(w.v * k));
   for (const w of D.workouts) {
     if (w.kind === 'cardio' && w.distance) w.distance = r1(w.distance * km);
+    if (w.fb && w.fb.load) w.fb.load = round(w.fb.load);
     if (w.kind === 'strength') w.exercises.forEach(e => e.sets.forEach(s => { if (s.weight) s.weight = round(s.weight) }));
   }
   if (D.active) D.active.exercises.forEach(e => e.sets.forEach(s => { const v = num(s.weight); if (v) s.weight = round(v) }));
@@ -1042,6 +1082,18 @@ const actions = {
     const cal = parseInt($('#eCal')?.value) || 0;
     closeSheet(); finishTimed(false, { rounds, mins, cal });
   },
+  fbSave(el) {
+    const w = D.workouts.find(x => x.id === el.dataset.id);
+    if (!el.dataset.skip) {
+      const edge = parseInt($('#fbEdge').value), load = num($('#fbLoadIn').value) ?? 0;
+      if (!(edge > 0)) { toast('Enter the edge size in mm'); return }
+      const editing = !!w.fb;
+      w.fb = { setup: $('#fbSetup').value, edge, grip: $('#fbGrip').value, load: r1(load), feel: +$('#fbFeel').value }; save();
+      if (editing) { closeSheet(); render(); toast('Updated'); return }
+    }
+    const n = fbNext();
+    celebrate(`${w.minutes} min`, [w.fb ? fbText(w.fb) : '', n && w.fb ? `Next time: ${fbLoad(n)} (${n.why})` : '']);
+  },
   calSave(el) {
     const w = D.workouts.find(x => x.id === el.dataset.id), cal = parseInt($('#calIn').value);
     if (!el.dataset.skip && !(cal > 0)) { toast('Enter the calories, or tap Skip'); return }
@@ -1050,6 +1102,7 @@ const actions = {
   },
   logPast(el) { logSheet(null, el.dataset.slot, el.dataset.sid) },
   editLog(el) { logSheet(el.dataset.id) },
+  editFb(el) { fbSheet(el.dataset.id) },
   saveLog(el) {
     const sid = $('#lSid').value, date = $('#lDate').value || ymd(), mins = parseInt($('#lMin').value), total = roundsOf(sid);
     if (!(mins > 0)) { toast('Enter how many minutes'); return }
@@ -1062,7 +1115,9 @@ const actions = {
       Object.assign(old, fields, { end: old.at + mins * 60000 }); D.workouts.sort((a, b) => a.at - b.at);
     } else {
       const at = atFor(date);
-      addWorkout({ id: uid(), kind: 'timed', at, end: at + mins * 60000, slot: date === ymd() && el.dataset.slot || null, ...fields });
+      const w = { id: uid(), kind: 'timed', at, end: at + mins * 60000, slot: date === ymd() && el.dataset.slot || null, ...fields };
+      addWorkout(w);
+      if (SESSIONS[sid].fb) { save(); render(); fbSheet(w.id); return }
     }
     save(); closeSheet(); render(); toast(old ? 'Updated' : 'Logged 👍');
   },
