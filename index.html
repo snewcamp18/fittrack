@@ -90,7 +90,6 @@
   .bigclock span { font-size: 15px; font-weight: 500; color: var(--muted); }
   .warm { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .warm b { font-size: 44px; font-weight: 800; font-variant-numeric: tabular-nums; }
-  a.howto { color: var(--accent); white-space: nowrap; }
   .pbar { height: 6px; background: var(--card2); border-radius: 3px; overflow: hidden; }
   .pbar i { display: block; height: 100%; background: var(--accent); width: 0; }
   .player.hard .pbar i { background: var(--hot); }
@@ -208,8 +207,7 @@ const repeat = (n, steps) => Array.from({ length: n }, (_, i) => typeof steps ==
  * Two 15–20 minute sessions a day. Mornings: strength (supersets, so three or four lifts fit) or engine intervals.
  * Evenings: Low Back Ability — main Flow split into Flow A / Flow B, plus his Mobility Flow — or handstand skill work.
  * Built for: barbell + rack + bench, dumbbells, pull-up bar, rower, Echo bike, back extension, jump rope. */
-const E = (n, s, r, o = {}) => ({ n, s, r, u: o.u || 'reps', w: !!o.w, t: o.t || '', ss: !!o.ss, ladder: !!o.ladder, url: o.url || '' });
-const LBA = slug => `https://www.lowbackability.com/exercises/${slug}`;
+const E = (n, s, r, o = {}) => ({ n, s, r, u: o.u || 'reps', w: !!o.w, t: o.t || '', ss: !!o.ss, ladder: !!o.ladder });
 const LADDER = E('', 0, 0, { ladder: true });   // stands in for the current handstand push-up level
 const HSPU = [
   E('Pike push-up', 3, 8, { t: 'Hips high, lower the top of your head to the floor just in front of your hands.' }),
@@ -240,39 +238,43 @@ const SESSIONS = {
     ex: [{ ...LADDER, ss: true }, E('Bench press', 3, 6, { w: true }),
          E('Bulgarian split squat', 2, 8, { w: true, ss: true, t: 'Back foot on the bench, dumbbells in hand. Reps per leg — stretches tight hip flexors too.' }),
          E('Seated good morning', 2, 10, { w: true, t: 'Low Back Ability style: sit on the bench, legs wide, hinge forward slowly and come back up. Start with just the bar or a light dumbbell and add a little at a time.' })] },
-  eng1: { kind: 'timed', icon: '🔥', name: 'Engine: Row', sub: 'Rower intervals',
+  eng1: { kind: 'timed', icon: '🔥', name: 'Engine: Row', sub: 'Rower intervals', cals: 'rower',
     about: ['4 min easy warm-up', '6 rounds: 1 min hard · 1 min easy', '2 min cool-down'],
     steps: [{ n: 'Easy row — warm up', s: 240 }, ...repeat(6, i => [{ n: 'Row hard', s: 60, hard: true, flow: i > 0, t: 'Hard but steady — you should finish every round.' }, { n: 'Row easy', s: 60, flow: true }]), { n: 'Easy row — cool down', s: 120, flow: true }] },
-  eng2: { kind: 'timed', icon: '🔥', name: 'Engine: Bike & rope', sub: 'Echo bike + jump rope',
-    about: ['4 min rope flow', '6 rounds: 20 s bike sprint · 40 s easy spin · 1 min jump rope', '2 min easy spin'],
-    steps: [{ n: 'Rope flow — warm up', s: 240 }, ...repeat(6, [{ n: 'Echo bike — all out', s: 20, hard: true }, { n: 'Easy spin', s: 40, flow: true }, { n: 'Jump rope', s: 60 }]), { n: 'Easy spin — cool down', s: 120 }] },
+  // `move`: seconds to get from one station to the next (bike ↔ rope), used for that step's get-ready countdown
+  eng2: { kind: 'timed', icon: '🔥', name: 'Engine: Bike & rope', sub: 'Echo bike + jump rope', cals: 'Echo bike',
+    about: ['2 min rope flow', '2 min easy bike, building up', '6 rounds: 20 s bike sprint · 40 s easy spin · 1 min jump rope', '10 s to switch stations', '2 min easy spin'],
+    steps: [{ n: 'Rope flow — warm up', s: 120 },
+      { n: 'Easy bike — build up', s: 120, move: 10, t: 'Start easy and build to a moderate pace, so the first sprint isn’t a cold start.' },
+      ...repeat(6, i => [{ n: 'Echo bike — all out', s: 20, hard: true, flow: i === 0, move: 10 }, { n: 'Easy spin', s: 40, flow: true }, { n: 'Jump rope', s: 60, move: 10 }]),
+      { n: 'Easy spin — cool down', s: 120, move: 10 }] },
   // Low Back Ability's main session ("Flow"), split in two so each half fits an evening
   flowA: { kind: 'strength', icon: '🦵', name: 'LBA Flow A', sub: 'Low Back Ability — legs & knees', min: 17, checkin: true,
-    ex: [E('Backward walk (sled warm-up)', 1, 60, { u: 'sec', t: 'No sled: walk backward, small steps, pushing through the balls of your feet. 10 m with a sled if you have one.', url: LBA('sled-warm-up') }),
-         E('Tibialis raise', 2, 25, { w: true, t: 'Back against a wall, heels out, lift your toes as high as you can.', url: LBA('tibialis-raise') }),
-         E('Deep calf raise', 2, 25, { w: true, t: 'Full stretch at the bottom off a step or plate.', url: LBA('deep-calf-raise') }),
-         E('Reverse step up', 2, 25, { w: true, t: 'Reps per side.', url: LBA('reverse-step-up') }),
-         E('Full range split squat', 2, 10, { w: true, t: 'Reps per side. Knee travels forward over the toes.', url: LBA('full-range-split-squats') })] },
+    ex: [E('Backward walk (sled warm-up)', 1, 60, { u: 'sec', t: 'No sled: walk backward, small steps, pushing through the balls of your feet. 10 m with a sled if you have one.' }),
+         E('Tibialis raise', 2, 25, { w: true, t: 'Back against a wall, heels out, lift your toes as high as you can.' }),
+         E('Deep calf raise', 2, 25, { w: true, t: 'Full stretch at the bottom off a step or plate.' }),
+         E('Reverse step up', 2, 25, { w: true, t: 'Reps per side.' }),
+         E('Full range split squat', 2, 10, { w: true, t: 'Reps per side. Knee travels forward over the toes.' })] },
   flowB: { kind: 'strength', icon: '🏋️', name: 'LBA Flow B', sub: 'Low Back Ability — upper back & trunk', min: 15, checkin: true,
-    ex: [E('External rotation', 1, 15, { w: true, t: 'Reps per side. Light — band or small dumbbell.', url: LBA('external-rotation') }),
-         E('Pullover', 2, 15, { w: true, t: 'Dumbbell on the bench.', url: LBA('pullover') }),
-         E('Trap 3 raise', 2, 10, { w: true, t: 'Light dumbbells, chest on an incline bench.', url: LBA('trap-3-raise') }),
-         E('Back extension', 1, 120, { u: 'sec', w: true, t: 'Two minutes of continuous reps on the back extension.', url: LBA('back-extensions') }),
-         E('Hip flexor kick out', 2, 5, { t: 'Reps per side.', url: LBA('hip-flexor-kick-out') }),
-         E('Side bend', 2, 12, { w: true, t: 'Reps per side.', url: LBA('side-bend') })] },
+    ex: [E('External rotation', 1, 15, { w: true, t: 'Reps per side. Light — band or small dumbbell.' }),
+         E('Pullover', 2, 15, { w: true, t: 'Dumbbell on the bench.' }),
+         E('Trap 3 raise', 2, 10, { w: true, t: 'Light dumbbells, chest on an incline bench.' }),
+         E('Back extension', 1, 120, { u: 'sec', w: true, t: 'Two minutes of continuous reps on the back extension.' }),
+         E('Hip flexor kick out', 2, 5, { t: 'Reps per side.' }),
+         E('Side bend', 2, 12, { w: true, t: 'Reps per side.' })] },
   // Low Back Ability's supporting session. Rep-based moves get a time slot: tap ⏭ when you finish early.
   mobility: { kind: 'timed', icon: '🧘', name: 'LBA Mobility Flow', sub: 'Low Back Ability — hips & low back', checkin: true,
     about: ['Couch stretch 2 × 1 min each side', 'Fire hydrants · hip abduction · 90/90 rotation — 10 each side', 'Outer hip dropset · pigeon strength', 'Deep squats 2 × 2 min', 'Loaded butterfly 2 × 1 min', 'Active hang 1 min'],
     steps: [
-      ...repeat(2, [{ n: 'Couch stretch', s: 60, sides: true, url: LBA('couch-stretch') }]),
-      { n: 'Fire hydrants — 10 reps', s: 40, sides: true, t: 'Tap ⏭ when you’re done.', url: LBA('fire-hydrants') },
-      { n: 'Hip abduction — 10 reps', s: 40, sides: true, t: 'Tap ⏭ when you’re done.', url: LBA('hip-abduction') },
-      { n: '90/90 rotation — 10 reps', s: 45, sides: true, t: 'Tap ⏭ when you’re done.', url: LBA('90-90-rotation') },
-      { n: 'Outer hip dropset', s: 90, sides: true, t: 'One full dropset — see the how-to. Tap ⏭ when you’re done.', url: LBA('outer-hip-dropset') },
-      { n: 'Pigeon strength — 20 reps', s: 60, sides: true, t: 'Tap ⏭ when you’re done.', url: LBA('pigeon-strength') },
-      ...repeat(2, [{ n: 'Deep squat', s: 120, url: LBA('deep-squats') }]),
-      ...repeat(2, [{ n: 'Loaded butterfly', s: 60, t: 'A weight on each knee, let them sink.', url: LBA('loaded-butterfly') }]),
-      { n: 'Active hang', s: 60, url: LBA('active-hangs') }] },
+      ...repeat(2, [{ n: 'Couch stretch', s: 60, sides: true, t: 'Knee against the wall or couch, squeeze the glute on that side, ribs down.' }]),
+      { n: 'Fire hydrants — 10 reps', s: 40, sides: true, t: 'On hands and knees, lift the bent knee out to the side, hips level. Tap ⏭ when you’re done.' },
+      { n: 'Hip abduction — 10 reps', s: 40, sides: true, t: 'Lying on your side, raise the top leg up and slightly back, toes pointing forward. Tap ⏭ when you’re done.' },
+      { n: '90/90 rotation — 10 reps', s: 45, sides: true, t: 'Sit tall in a 90/90 and rotate both knees to the other side, slowly. Tap ⏭ when you’re done.' },
+      { n: 'Outer hip dropset', s: 90, sides: true, t: 'Side-lying leg raises until you can’t do another full rep, then keep going with smaller pulses until that runs out too. Tap ⏭ when you’re done.' },
+      { n: 'Pigeon strength — 20 reps', s: 60, sides: true, t: 'From a pigeon position, rock forward and back under control, squeezing the glute of the front leg. Tap ⏭ when you’re done.' },
+      ...repeat(2, [{ n: 'Deep squat', s: 120, t: 'Sit in the bottom of a squat, heels down. Hold the rack for balance and push your knees out.' }]),
+      ...repeat(2, [{ n: 'Loaded butterfly', s: 60, t: 'A weight on each knee, let them sink.' }]),
+      { n: 'Active hang', s: 60, t: 'Hang from the bar and pull your shoulders down away from your ears. Hold.' }] },
   unwind: { kind: 'timed', icon: '🌙', name: 'Unwind', sub: 'Hips, legs & low back (the original evening routine)', checkin: true,
     steps: [
       { n: 'Passive dead hang', s: 30, t: 'Relax and let your spine stretch out. Feet can touch a box if needed.' },
@@ -466,7 +468,7 @@ const greeting = () => { const h = new Date().getHours(); return h < 12 ? 'Good 
 const tipOfDay = () => TIPS[Math.floor(Date.now() / 864e5) % TIPS.length];
 const scrollKeep = fn => { const y = window.scrollY; fn(); window.scrollTo(0, y) };
 
-let tab = 'today', selEx = null, clock = null;
+let tab = 'today', selEx = null, selCal = 'eng1', clock = null;
 function go(t) { tab = t; render(); window.scrollTo(0, 0) }
 function render() {
   clearInterval(clock); clock = null;
@@ -529,6 +531,7 @@ function slotCard(slot, sid) {
   return `<section class="card slot ${done ? 'isdone' : ''}">
     <div class="exhead"><p class="eyebrow">${label} · ~${minsOf(s)} min</p>${done ? '<span class="donetag">✓ Done</span>' : ''}</div>
     <h2>${s.icon} ${esc(s.name)}</h2><p class="muted small">${esc(s.sub)}</p>
+    ${s.cals && calTarget(sid) ? `<p class="hint">🎯 Last time ${calTarget(sid).last} cal · best ${calTarget(sid).best}</p>` : ''}
     <ul class="plan">${previewList(s)}</ul>
     ${done ? '' : `<button class="primary wide" data-act="begin" data-sid="${sid}" data-slot="${slot}">Start</button>`}
     <button class="link" data-act="swap" data-slot="${slot}">${done ? 'Do another session' : 'Swap for another session'}</button>
@@ -579,7 +582,7 @@ function begin(sid, slot) {
 function startWorkout(sid, slot) {
   D.active = {
     id: uid(), at: Date.now(), session: sid, slot,
-    exercises: SESSIONS[sid].ex.map(exDef).map(def => { const s = suggest(def); return { n: def.n, u: def.u, w: def.w, t: def.t, url: def.url, ss: def.ss, ladder: def.ladder, hint: s.hint, last: s.last || '', target: def.r, tr: s.tr, ps: s.sets.length, sets: s.sets } })
+    exercises: SESSIONS[sid].ex.map(exDef).map(def => { const s = suggest(def); return { n: def.n, u: def.u, w: def.w, t: def.t, ss: def.ss, ladder: def.ladder, hint: s.hint, last: s.last || '', target: def.r, tr: s.tr, ps: s.sets.length, sets: s.sets } })
   };
   save(); keepAwake(); go('today');
 }
@@ -591,7 +594,7 @@ function workoutHTML() {
       <div class="exhead"><h2>${esc(ex.n)}</h2><span class="muted small">${ex.sets.filter(s => s.done).length}/${ex.sets.length} sets</span></div>
       ${ex.ladder ? `<p class="tag">🤸 Handstand push-up level ${D.hspu + 1} of ${HSPU.length}</p>` : ''}
       ${ex.ss && a.exercises[i + 1] ? `<p class="tag">↕ Superset — alternate sets with ${esc(a.exercises[i + 1].n)}</p>` : ''}
-      ${ex.t || ex.url ? `<p class="muted small">${esc(ex.t)}${ex.url ? ` <a class="howto" href="${esc(ex.url)}" target="_blank" rel="noopener">How-to ↗</a>` : ''}</p>` : ''}
+      ${ex.t ? `<p class="muted small">${esc(ex.t)}</p>` : ''}
       ${ex.hint ? `<p class="hint">${esc(ex.hint)}</p>` : ''}
       ${ex.last ? `<p class="muted small">Last time: ${esc(ex.last)}</p>` : ''}
       <div>${ex.sets.map((s, j) => `<div class="set ${s.done ? 'done' : ''}">
@@ -681,9 +684,10 @@ let P = null, pTick = null;
 function startTimed(sid, slot) {
   initAudio();
   const real = SESSIONS[sid].steps.flatMap(s => s.sides ? [{ ...s, n: `${s.n} — left` }, { ...s, n: `${s.n} — right` }] : [s]);
-  // a short "get ready" countdown before the session and before each step, except steps that carry straight on (same machine)
+  // a short "get ready" countdown before the session and before each step, except steps that carry straight on (same machine);
+  // moving to another station gets at least that step's `move` time
   const prep = D.settings.prep;
-  const steps = prep ? real.flatMap((s, i) => i && s.flow ? [s] : [{ n: 'Get ready', s: prep, ready: true, next: s }, s]) : real;
+  const steps = real.flatMap((s, i) => { const g = i && s.flow ? 0 : Math.max(prep, i ? s.move || 0 : 0); return g ? [{ n: 'Get ready', s: g, ready: true, next: s }, s] : [s] });
   P = { sid, slot, steps, i: 0, at: Date.now(), end: Date.now() + steps[0].s * 1000, paused: false, left: 0, lastBeep: null };
   clearInterval(pTick); pTick = setInterval(tickTimed, 200);
   keepAwake(); beep(880, 0.3); go('today');
@@ -713,13 +717,13 @@ function playerHTML() {
   const cur = st.ready ? P.i + 1 : P.i, shown = st.ready ? st.next : st;
   const next = P.steps.slice(cur + 1).find(x => !x.ready);
   const stepNo = P.steps.slice(0, cur + 1).filter(x => !x.ready).length, stepTotal = P.steps.filter(x => !x.ready).length;
-  return `<header class="top"><div><p class="eyebrow">${s.icon} ${esc(s.name)}</p><p class="bigclock"><b id="pLeft">${mmss(totalLeft())}</b> <span>left · step ${stepNo} of ${stepTotal}</span></p></div><button class="ghost small" data-act="pquit">End</button></header>
+  return `<header class="top"><div><p class="eyebrow">${s.icon} ${esc(s.name)}</p><p class="bigclock"><b id="pLeft">${mmss(totalLeft())}</b> <span>left · step ${stepNo} of ${stepTotal}</span></p>${s.cals && calTarget(P.sid) ? `<p class="hint">🎯 Beat ${calTarget(P.sid).last} cal (best ${calTarget(P.sid).best})</p>` : ''}</div><button class="ghost small" data-act="pquit">End</button></header>
   <section class="card player ${st.ready ? 'ready' : st.hard ? 'hard' : ''}">
     <h1 class="pstep">${st.ready ? 'Get ready' : esc(st.n)}</h1>
     ${st.ready ? `<p class="pstep"><b>${esc(shown.n)}</b></p>` : ''}
     <p class="ptime" id="pTime">${mmss(left)}</p>
     <div class="pbar"><i id="pBar" style="width:${100 * (st.s - left) / st.s}%"></i></div>
-    ${shown.t || shown.url ? `<p class="muted">${esc(shown.t || '')}${shown.url ? ` <a class="howto" href="${esc(shown.url)}" target="_blank" rel="noopener">How-to ↗</a>` : ''}</p>` : ''}
+    ${shown.t ? `<p class="muted">${esc(shown.t)}</p>` : ''}
     <p class="muted small">${st.ready ? 'Starts when the countdown ends' : next ? `Next: ${esc(next.n)}` : 'Last one!'}</p>
     <div class="pctl"><button data-act="pprev" aria-label="Previous step">⏮</button><button class="primary" data-act="ppause">${P.paused ? '▶ Resume' : '❚❚ Pause'}</button><button data-act="pnext" aria-label="Next step">⏭</button></div>
   </section>
@@ -731,11 +735,12 @@ function finishTimed(complete, opts = {}) {
   const mins = opts.mins ?? Math.round((Date.now() - p.at) / 60000), total = roundsOf(p.sid);
   if (!complete && mins < 1) { render(); toast('Session ended'); return }
   const rounds = complete ? total : opts.rounds ?? 0;
-  addWorkout({ id: uid(), kind: 'timed', session: p.sid, slot: p.slot, at: p.at, end: Date.now(), date: ymd(p.at), minutes: Math.max(1, mins),
-    complete: complete || (total > 0 && rounds >= total), ...(total ? { rounds, roundsTotal: total } : {}) });
-  save(); tab = 'today'; render();
+  const w = { id: uid(), kind: 'timed', session: p.sid, slot: p.slot, at: p.at, end: Date.now(), date: ymd(p.at), minutes: Math.max(1, mins),
+    complete: complete || (total > 0 && rounds >= total), ...(total ? { rounds, roundsTotal: total } : {}), ...(opts.cal > 0 ? { cal: opts.cal } : {}) };
+  addWorkout(w); save(); tab = 'today'; render();
   if (SESSIONS[p.sid].checkin) checkinSheet(true);
-  else { beep(1046, 0.6); celebrate(`${Math.max(1, mins)} min`) }
+  else if (SESSIONS[p.sid].cals && !('cal' in opts)) { beep(1046, 0.6); calSheet(w.id) }
+  else { beep(1046, 0.6); celebrate(`${w.minutes} min`, [w.cal ? calLine(w) : '']) }
 }
 // Ending early: save what was done, with rounds and minutes you can correct
 function endSheet() {
@@ -743,6 +748,7 @@ function endSheet() {
   sheet(`<h2>End session?</h2><p class="muted">Save what you did — fix the numbers if they're not quite right.</p>
     <div class="two" style="margin-top:12px">${total ? `<label class="field">Rounds done (of ${total})<input id="eRounds" inputmode="numeric" value="${done}"></label>` : ''}
     <label class="field">Minutes<input id="eMin" inputmode="numeric" value="${Math.max(1, Math.round((Date.now() - P.at) / 60000))}"></label></div>
+    ${SESSIONS[P.sid].cals ? `<label class="field">Calories on the ${esc(SESSIONS[P.sid].cals)} (optional)<input id="eCal" inputmode="numeric"></label>` : ''}
     <div class="row end"><button class="ghost" data-act="close">Keep going</button><button class="danger" data-act="pdiscard">Discard</button><button class="primary" data-act="psaveEnd">Save</button></div>`);
 }
 // Logging a timed session after the fact (no timer), or correcting one already in history
@@ -752,11 +758,29 @@ function logSheet(id, slot, pick) {
     <label class="field">Session<select id="lSid" ${w ? '' : 'data-fresh="1"'}>${Object.entries(SESSIONS).filter(([, s]) => s.kind === 'timed').map(([k, s]) => `<option value="${k}" ${k === sid ? 'selected' : ''}>${s.icon} ${esc(s.name)}</option>`).join('')}</select></label>
     <div class="two" style="margin-top:12px"><label class="field" id="lRoundsBox">Rounds done (of <span id="lTotal">${total}</span>)<input id="lRounds" inputmode="numeric" value="${w ? w.rounds ?? (w.complete === false ? '' : total) : total}" placeholder="${total}"></label>
     <label class="field">Minutes<input id="lMin" inputmode="numeric" value="${w ? w.minutes : minsOf(SESSIONS[sid])}"></label></div>
+    <label class="field" id="lCalBox">Calories on the monitor (optional)<input id="lCal" inputmode="numeric" value="${w && w.cal ? w.cal : ''}"></label>
     <label class="field">Date<input id="lDate" type="date" value="${w ? w.date : ymd()}" max="${ymd()}"></label>
     <div class="row end"><button class="ghost" data-act="close">Cancel</button><button class="primary" data-act="saveLog" data-id="${w ? esc(w.id) : ''}" data-slot="${slot || ''}">Save</button></div>`);
   syncRounds();
 }
-function syncRounds() { const t = roundsOf($('#lSid').value); $('#lRoundsBox').style.display = t ? '' : 'none'; $('#lTotal').textContent = t }
+/* Calories from the rower / Echo bike monitor, so each Engine session can be compared with the last one */
+const calsBefore = w => D.workouts.filter(x => x.session === w.session && x.cal > 0 && x.id !== w.id && x.at < w.at);
+const calTarget = sid => { const h = D.workouts.filter(x => x.session === sid && x.cal > 0); return h.length ? { last: h.at(-1).cal, best: Math.max(...h.map(x => x.cal)) } : null };
+function calLine(w) {
+  const prev = calsBefore(w), last = prev.at(-1);
+  if (!last) return `${w.cal} cal — your first one logged. Beat it next time!`;
+  const diff = w.cal - last.cal, best = w.cal > Math.max(...prev.map(x => x.cal)) ? ' · new best!' : '';
+  return diff > 0 ? `🔥 ${w.cal} cal — ${diff} more than last time${best}` : diff < 0 ? `${w.cal} cal — ${-diff} fewer than last time (${last.cal})` : `${w.cal} cal — same as last time`;
+}
+function calSheet(id) {
+  const w = D.workouts.find(x => x.id === id), t = calTarget(w.session);
+  sheet(`<div class="celebrate"><div class="emoji">🔥</div><h2>Done!</h2>
+    <p>How many calories did the ${esc(SESSIONS[w.session].cals)} show?</p>
+    ${t ? `<p class="muted small">Last time ${t.last} cal · best ${t.best}</p>` : ''}
+    <label class="field"><input id="calIn" inputmode="numeric" placeholder="${t ? t.last : 'e.g. 120'}" aria-label="Calories"></label>
+    <div class="row end"><button class="ghost" data-act="calSave" data-id="${esc(id)}" data-skip="1">Skip</button><button class="primary" data-act="calSave" data-id="${esc(id)}">Save</button></div></div>`);
+}
+function syncRounds() { const sid = $('#lSid').value, t = roundsOf(sid); $('#lRoundsBox').style.display = t ? '' : 'none'; $('#lTotal').textContent = t; $('#lCalBox').style.display = SESSIONS[sid].cals ? '' : 'none' }
 
 function checkinSheet(afterSession) {
   sheet(`<div class="celebrate">${afterSession ? '<div class="emoji">🧘</div><h2>Done!</h2>' : ''}
@@ -795,7 +819,7 @@ function workoutTitle(w) {
 }
 function workoutSummary(w) {
   if (w.kind === 'cardio') return `${w.minutes} min${w.distance ? ` · ${w.distance} ${distUnit()}` : ''}`;
-  if (w.kind === 'timed') return `${w.minutes} min${w.roundsTotal ? ` · ${w.rounds}/${w.roundsTotal} rounds` : w.complete === false ? ' · ended early' : ''}`;
+  if (w.kind === 'timed') return `${w.minutes} min${w.roundsTotal ? ` · ${w.rounds}/${w.roundsTotal} rounds` : w.complete === false ? ' · ended early' : ''}${w.cal ? ` · ${w.cal} cal` : ''}`;
   const sets = w.exercises.reduce((n, e) => n + e.sets.length, 0);
   return `${w.exercises.length} exercises · ${sets} sets · ${minutes(w)} min`;
 }
@@ -887,6 +911,12 @@ function progressHTML() {
     ${barChart(weeks.map(d => counts[ymd(d)] || 0), weeks.map(d => `${d.getMonth() + 1}/${d.getDate()}`), s.goal)}
   </section>
   <section class="card">
+    <div class="exhead"><h2>🔥 Engine calories</h2><select id="calSel" aria-label="Engine session" style="width:auto">${['eng1', 'eng2'].map(k => `<option value="${k}" ${k === selCal ? 'selected' : ''}>${esc(SESSIONS[k].name.replace('Engine: ', ''))}</option>`).join('')}</select></div>
+    ${(() => { const h = D.workouts.filter(w => w.session === selCal && w.cal > 0); return h.length
+      ? `<p class="muted small">Last ${h.at(-1).cal} cal · best ${Math.max(...h.map(w => w.cal))} · ${h.length} logged</p>${lineChart(h.map(w => ({ x: w.at, y: w.cal })), 'Calories per session')}`
+      : '<p class="muted small empty">Enter the calories from the monitor when you finish a session.</p>' })()}
+  </section>
+  <section class="card">
     <h2>Strength</h2>
     ${names.length ? `<select id="exSel" aria-label="Exercise">${names.map(n => `<option ${n === selEx ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
       ${exPts.length ? `<p class="muted small">Best: ${Math.max(...exPts.map(p => p.y))} ${esc(exUnit)} · ${exPts.length} session${exPts.length === 1 ? '' : 's'}</p>` : ''}
@@ -917,7 +947,7 @@ function settingsHTML() {
     <h2>How it works</h2>
     <p class="muted small"><b>Strength</b> pairs exercises in supersets so you get three or four lifts done in 20 minutes. Lift with one or two reps left in the tank — you still have to work. When you hit every set, the next session asks for a rep more; at the top of the rep range it adds a set, and loaded lifts then go up in weight. Miss twice in a row at the same load and it eases you back (about 10% lighter) to rebuild. You can switch to simple progression in Settings.</p>
     <p class="muted small"><b>Engine</b> intervals on the rower and Echo bike build the fitness to run around with your kids and recover between climbs.</p>
-    <p class="muted small"><b>Evenings: Low Back Ability.</b> His main Flow is split into Flow A (legs & knees) and Flow B (upper back & trunk), twice a week each, and his Mobility Flow is on Sunday. Each exercise links to his how-to page. Your back is trained rather than protected, with the load going up slowly. Seated good mornings in the mornings add to it. The original Unwind is still in Swap.</p>
+    <p class="muted small"><b>Evenings: Low Back Ability.</b> His main Flow is split into Flow A (legs & knees) and Flow B (upper back & trunk), twice a week each, and his Mobility Flow is on Sunday. Your back is trained rather than protected, with the load going up slowly. Seated good mornings in the mornings add to it. The original Unwind is still in Swap.</p>
     <p class="muted small"><b>Climbing</b>: pull-ups, dead hangs, hanging knee raises and hollow holds build pulling, grip and core strength.</p>
     <p class="muted small"><b>Freestanding handstand push-up</b>: a ${HSPU.length}-step ladder on Strength A and C. The wall steps build the pressing strength, while Tuesday and Thursday evenings train the balance from day one, so both are ready by the time you reach the freestanding steps.</p>
     <p class="muted small">If back pain is sharp, runs down a leg, or isn't getting better after a few weeks, get it checked by a physio.</p>
@@ -1009,7 +1039,14 @@ const actions = {
   pdiscard() { if (!confirm('Discard this session? Nothing from it will be saved.')) return; clearInterval(pTick); pTick = null; P = null; letSleep(); closeSheet(); render(); toast('Session discarded') },
   psaveEnd() {
     const total = roundsOf(P.sid), rounds = Math.min(total, Math.max(0, parseInt($('#eRounds')?.value) || 0)), mins = Math.max(1, parseInt($('#eMin').value) || 1);
-    closeSheet(); finishTimed(false, { rounds, mins });
+    const cal = parseInt($('#eCal')?.value) || 0;
+    closeSheet(); finishTimed(false, { rounds, mins, cal });
+  },
+  calSave(el) {
+    const w = D.workouts.find(x => x.id === el.dataset.id), cal = parseInt($('#calIn').value);
+    if (!el.dataset.skip && !(cal > 0)) { toast('Enter the calories, or tap Skip'); return }
+    if (!el.dataset.skip) { w.cal = cal; save() }
+    celebrate(`${w.minutes} min`, [w.cal ? calLine(w) : '']);
   },
   logPast(el) { logSheet(null, el.dataset.slot, el.dataset.sid) },
   editLog(el) { logSheet(el.dataset.id) },
@@ -1017,7 +1054,8 @@ const actions = {
     const sid = $('#lSid').value, date = $('#lDate').value || ymd(), mins = parseInt($('#lMin').value), total = roundsOf(sid);
     if (!(mins > 0)) { toast('Enter how many minutes'); return }
     const rounds = Math.min(total, Math.max(0, parseInt($('#lRounds').value) || 0));
-    const fields = { session: sid, date, minutes: mins, complete: !total || rounds >= total, ...(total ? { rounds, roundsTotal: total } : { rounds: undefined, roundsTotal: undefined }) };
+    const cal = SESSIONS[sid].cals ? parseInt($('#lCal').value) || 0 : 0;
+    const fields = { session: sid, date, minutes: mins, complete: !total || rounds >= total, ...(total ? { rounds, roundsTotal: total } : { rounds: undefined, roundsTotal: undefined }), cal: cal > 0 ? cal : undefined };
     const old = el.dataset.id && D.workouts.find(w => w.id === el.dataset.id);
     if (old) {
       if (old.date !== date) { old.at = atFor(date); old.slot = null }
@@ -1067,6 +1105,7 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const el = e.target;
   if (el.id === 'exSel') { selEx = el.value; render(); return }
+  if (el.id === 'calSel') { selCal = el.value; render(); return }
   if (el.id === 'lSid') { syncRounds(); if (el.dataset.fresh) { $('#lRounds').value = roundsOf(el.value); $('#lMin').value = minsOf(SESSIONS[el.value]) } return }
   if (el.id === 'importFile' && el.files[0]) {
     el.files[0].text().then(txt => {
